@@ -10,8 +10,11 @@
 const fs = require('fs'), path = require('path'), net = require('net'), tls = require('tls'), zlib = require('zlib'), crypto = require('crypto');
 
 const HERE = __dirname;
+const ENV = process.env;
+const CI = !!ENV.VS_FTP_HOST;                    // GitHub Actions: Konfiguration aus Secrets statt Datei
+const DATA = ENV.VS_DATA ? path.resolve(ENV.VS_DATA) : HERE; // Cache + Zustand (in Actions per actions/cache erhalten)
 const CONFIG = path.join(HERE, 'valheim-sync.config.json');
-const STATE = path.join(HERE, '.valheim-sync-state.json');
+const STATE = path.join(DATA, '.valheim-sync-state.json');
 const ARGS = process.argv.slice(2);
 const LOOP = ARGS.includes('--loop'), FORCE = ARGS.includes('--force');
 
@@ -237,7 +240,7 @@ async function runOnce(cfg) {
     state.remoteDir = dir; state.worlds = worlds;
     const files = await listWorldFiles(ftp, dir, world, worlds);
     if (!files.some((f) => /\.fwl2?$/i.test(f.rel))) throw new Error('Welt „' + world + '“ nicht vollständig gefunden in ' + dir);
-    const cache = path.join(HERE, 'welt-cache', world.replace(/[^\w.-]+/g, '_'));
+    const cache = path.join(DATA, 'welt-cache', world.replace(/[^\w.-]+/g, '_'));
     fs.mkdirSync(cache, { recursive: true });
     const old = state.files || {}; const now = {}; let changed = 0, bytes = 0;
     for (const f of files) {
@@ -265,10 +268,12 @@ async function publish(cfg, state, list, world) {
     log('Wandle um …');
     const snap = convert(list, { gunzip: (u) => new Uint8Array(zlib.gunzipSync(u)), stripIds: cfg.stripSteamIds !== false });
     const gz = zlib.gzipSync(Buffer.from(JSON.stringify(snap)), { level: 9 });
-    const outDir = path.join(HERE, 'ausgabe'); fs.mkdirSync(outDir, { recursive: true });
+    const outDir = path.join(DATA, 'ausgabe'); fs.mkdirSync(outDir, { recursive: true });
     const base = (snap.world.name || world).replace(/[^\w.-]+/g, '_');
     fs.writeFileSync(path.join(outDir, base + '.vwelt'), gz);
     if (cfg.saveShareHtml !== false) fs.writeFileSync(path.join(outDir, base + '.html'), shareHtml(snap, gz));
+    if (cfg.outFile) { fs.mkdirSync(path.dirname(cfg.outFile), { recursive: true }); fs.writeFileSync(cfg.outFile, gz); log('Gespeichert als', cfg.outFile); }
+    changedOut = true;
     log(`Umgewandelt: ${snap.stats.zdos.toLocaleString('de-DE')} Objekte, ${snap.bases.length} Basen, ${(gz.length / 1e6).toFixed(2)} MB → Ordner „ausgabe“.`);
     snap.warnings.forEach((w) => log('Hinweis:', w));
     const g = cfg.github || {};
@@ -280,8 +285,27 @@ async function publish(cfg, state, list, world) {
     } else { state.lastUpload = state.lastUpload || 'lokal'; fs.writeFileSync(STATE, JSON.stringify(state, null, 1)); log('GitHub nicht eingerichtet – nur lokal gespeichert.'); }
 }
 
+let changedOut = false;
+function envConfig() {
+  const b = (v, d) => (v === undefined || v === '' ? d : /^(1|true|ja|yes)$/i.test(v));
+  return {
+    ftp: { host: ENV.VS_FTP_HOST, port: +ENV.VS_FTP_PORT || 21, user: ENV.VS_FTP_USER, password: ENV.VS_FTP_PASSWORD || '', secure: b(ENV.VS_FTP_SECURE, false), remoteDir: ENV.VS_FTP_DIR || 'auto', dumpPath: ENV.VS_DUMP_PATH === undefined ? 'auto' : ENV.VS_DUMP_PATH },
+    source: ENV.VS_SOURCE || 'auto', world: ENV.VS_WORLD || '',
+    github: {},                                   // kein API-Upload: der Workflow veröffentlicht die Seite selbst
+    outFile: path.resolve(ENV.VS_OUT || 'live/welt.vwelt'),
+    stripSteamIds: b(ENV.VS_STRIP_IDS, true), saveShareHtml: false, intervalMinutes: 10
+  };
+}
+
 (async () => {
   console.log('Valheim-Sync (inoffiziell) – FTP → .vwelt → GitHub\n');
+  if (CI) {
+    fs.mkdirSync(DATA, { recursive: true });
+    const cfg = envConfig(); let code = 0;
+    try { await runOnce(cfg); } catch (e) { log('FEHLER:', e.message); code = 1; }
+    if (ENV.GITHUB_OUTPUT) fs.appendFileSync(ENV.GITHUB_OUTPUT, 'changed=' + changedOut + '\n');
+    process.exit(code);
+  }
   if (!fs.existsSync(CONFIG)) {
     fs.writeFileSync(CONFIG, JSON.stringify(TEMPLATE, null, 2));
     console.log('Konfiguration angelegt: ' + CONFIG + '\nBitte FTP- und GitHub-Daten eintragen, speichern und neu starten.');
