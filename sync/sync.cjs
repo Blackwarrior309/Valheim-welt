@@ -251,8 +251,10 @@ async function runOnce(cfg) {
     if (state.v !== 2) { ['remoteDir', 'worlds', 'files', 'lastUpload'].forEach((k) => delete state[k]); state.v = 2; if (!(ftpc.remoteDir && ftpc.remoteDir !== 'auto')) dir = undefined; worlds = []; }
     let picked = null;
     if (!dir) { log('Suche Weltordner auf dem Server …'); const f = await findWorldDir(ftp, cfg.world); dir = f.dir; worlds = f.worlds; picked = f.picked || null; state.picked = picked; log('Gewählt:', dir, '→', worlds.join(', ')); }
-    else { picked = state.picked || null; if (!worlds.length) worlds = (await ftp.list(dir)).filter((i) => /\.fwl2?$/i.test(i.name)).map((i) => i.name.replace(/\.fwl2?$/i, '')); }
-    const world = (cfg.world && worlds.includes(cfg.world) ? cfg.world : null) || picked || worlds[0];
+    else { picked = null; worlds = (await ftp.list(dir)).filter((i) => !i.dir && /\.fwl2?$/i.test(i.name) && !/backup|\.old$/i.test(i.name)).map((i) => i.name.replace(/\.fwl2?$/i, '')); } // jedes Mal neu: Valheim nummeriert Spielstände beim Speichern hoch
+    // Valheim 1.0 speichert als _main.<Nummer> – immer die höchste Nummer (neuester Stand) nehmen
+    const gen = worlds.filter((w) => /^_main\.\d+$/.test(w)).sort((a, b) => +b.split('.')[1] - +a.split('.')[1]);
+    const world = (cfg.world && worlds.includes(cfg.world) ? cfg.world : null) || gen[0] || picked || worlds[0];
     if (!world) throw new Error('Keine Welt in ' + dir + ' gefunden.');
     if (!cfg.world && worlds.length > 1) log('Mehrere Welten gefunden (' + worlds.join(', ') + '), nehme die größte: „' + world + '“. Andere mit "world" in der Konfiguration wählen.');
     state.remoteDir = dir; state.worlds = worlds;
@@ -260,6 +262,8 @@ async function runOnce(cfg) {
     if (!files.some((f) => /\.fwl2?$/i.test(f.rel))) throw new Error('Welt „' + world + '“ nicht vollständig gefunden in ' + dir);
     const cache = path.join(DATA, 'welt-cache', world.replace(/[^\w.-]+/g, '_'));
     fs.mkdirSync(cache, { recursive: true });
+    // ältere Spielstände (_main.<alte Nummer>) aus dem Zwischenspeicher entfernen
+    for (const d of fs.readdirSync(path.dirname(cache))) if (d !== path.basename(cache)) try { fs.rmSync(path.join(path.dirname(cache), d), { recursive: true, force: true }); } catch (e) { }
     const old = state.files || {}; const now = {}; let changed = 0, bytes = 0;
     for (const f of files) {
       const key = f.rel, sig = f.size + '|' + f.mod, local = path.join(cache, f.rel);
