@@ -55,7 +55,7 @@ jobs:
           VS_FTP_PASSWORD: ${{ secrets.VS_FTP_PASSWORD }}
           VS_FTP_DIR: ${{ secrets.VS_FTP_DIR }}
           VS_WORLD: ${{ secrets.VS_WORLD }}
-          VS_DUMP_PATH: ''          # ohne Server-Mod: nur Spielstände
+          VS_DUMP_PATH: 'auto'      # Server-Mod-Datei (welt.vwdump) nehmen, falls vorhanden – sonst Spielstände
           VS_STRIP_IDS: 'true'      # Repo ist öffentlich → keine Steam-IDs
           VS_DATA: ${{ runner.temp }}/sync-data
           VS_OUT: ${{ runner.temp }}/sync-data/letzter-stand.vwelt

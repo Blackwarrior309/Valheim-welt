@@ -147,27 +147,40 @@ namespace ValheimWeltLive
             byte[] bio = biomeGrid;
             List<Rec> recs = null; string world = "", seed = ""; List<string> keys = new List<string>(); string players = playersJson;
             var locs = new List<KeyValuePair<string, Vector3>>(); var locPlaced = new List<bool>();
+            // ZDO-Liste kopieren und in kleinen Portionen (je Frame 16384 Objekte) auslesen – kein Ruckler für Spieler
+            var dict = GetZdoDict();
+            if (dict == null) { Logger.LogWarning("ZDOs nicht gefunden (Spielversion geändert?)"); building = false; yield break; }
+            ZDO[] all = null;
+            try { all = new ZDO[dict.Count]; dict.Values.CopyTo(all, 0); } catch (Exception e) { Logger.LogWarning("ZDO-Liste: " + e.Message); }
+            if (all == null) { building = false; yield break; }
+            recs = new List<Rec>(all.Length);
+            bool strip = cfgStrip.Value;
+            for (int zi = 0; zi < all.Length; zi++)
+            {
+                ZDO z = all[zi];
+                if (z != null)
+                {
+                    try
+                    {
+                        var r = new Rec { prefab = z.GetPrefab(), pos = z.GetPosition(), yaw = z.GetRotation().eulerAngles.y, scale = 1f };
+                        Vector3 sc = z.GetVec3(H_SCALE, Vector3.zero); if (sc != Vector3.zero) r.scale = sc.x;
+                        r.creator = z.GetLong(H_CREATOR, 0L); r.owner = z.GetLong(H_OWNER, 0L);
+                        foreach (int k in STRING_KEYS)
+                        {
+                            if (strip && (k == H_AUTHOR || k == H_TAGAUTHOR)) continue;
+                            string v = z.GetString(k, ""); if (string.IsNullOrEmpty(v)) continue;
+                            (r.strings ?? (r.strings = new List<KeyValuePair<int, string>>())).Add(new KeyValuePair<int, string>(k, v));
+                        }
+                        byte[] it = z.GetByteArray(H_ITEMS, null); if (it != null && it.Length > 0) r.items = it;
+                        recs.Add(r);
+                    }
+                    catch { }
+                }
+                if ((zi & 16383) == 16383) yield return null;
+                if (ZNet.instance == null) { building = false; yield break; }   // Welt verlassen
+            }
             try
             {
-                var dict = GetZdoDict();
-                if (dict == null) { Logger.LogWarning("ZDOs nicht gefunden (Spielversion geändert?)"); building = false; yield break; }
-                recs = new List<Rec>(dict.Count);
-                bool strip = cfgStrip.Value;
-                foreach (ZDO z in dict.Values)
-                {
-                    if (z == null) continue;
-                    var r = new Rec { prefab = z.GetPrefab(), pos = z.GetPosition(), yaw = z.GetRotation().eulerAngles.y, scale = 1f };
-                    Vector3 sc = z.GetVec3(H_SCALE, Vector3.zero); if (sc != Vector3.zero) r.scale = sc.x;
-                    r.creator = z.GetLong(H_CREATOR, 0L); r.owner = z.GetLong(H_OWNER, 0L);
-                    foreach (int k in STRING_KEYS)
-                    {
-                        if (strip && (k == H_AUTHOR || k == H_TAGAUTHOR)) continue;
-                        string v = z.GetString(k, ""); if (string.IsNullOrEmpty(v)) continue;
-                        (r.strings ?? (r.strings = new List<KeyValuePair<int, string>>())).Add(new KeyValuePair<int, string>(k, v));
-                    }
-                    byte[] it = z.GetByteArray(H_ITEMS, null); if (it != null && it.Length > 0) r.items = it;
-                    recs.Add(r);
-                }
                 world = ZNet.instance.GetWorldName() ?? "";
                 try { var w = typeof(ZNet).GetField("m_world", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Static | BindingFlags.Instance)?.GetValue(ZNet.instance) as World; if (w != null) seed = w.m_seedName ?? ""; } catch { }
                 try { keys = ZoneSystem.instance.GetGlobalKeys(); } catch { }

@@ -158,7 +158,7 @@ async function findWorldDir(ftp, world) {
 async function findDump(ftp) {
   const queue = [['/', 0]], seen = new Set(); let visited = 0;
   const PRIO = /BepInEx|config|ValheimWeltLive/i, SKIP = /^(proc|sys|dev|lib|bin|usr|etc|tmp|steamapps|steamcmd|MonoBleedingEdge|valheim_server_Data|plugins|cache|logs?)$/i;
-  while (queue.length && visited < 300) {
+  while (queue.length && visited < 80) {
     const [dir, depth] = queue.shift(); if (seen.has(dir)) continue; seen.add(dir); visited++;
     let items; try { items = await ftp.list(dir); } catch (e) { continue; }
     const hit = items.find((i) => !i.dir && /\.vwdump$/i.test(i.name)); if (hit) return { path: join(dir, hit.name), size: hit.size, mod: hit.mod };
@@ -236,14 +236,19 @@ async function runOnce(cfg) {
       if (!dump && !(state.noDumpAt && Date.now() - state.noDumpAt < 6 * 3600e3)) { log('Suche Live-Dump des Mods …'); dump = await findDump(ftp); if (!dump) { state.noDumpAt = Date.now(); log('Kein Mod-Dump gefunden – nutze den Spielstand.'); } else delete state.noDumpAt; }
       if (dump) {
         state.dumpPath = dump.path; const sig = dump.size + '|' + dump.mod;
-        if (!FORCE && state.dumpSig === sig && state.lastUpload) { log('Mod-Dump unverändert.'); fs.writeFileSync(STATE, JSON.stringify(state, null, 1)); return; }
-        log('Lade Mod-Dump', dump.path, '(' + (dump.size / 1e6).toFixed(1) + ' MB) …');
-        const data = await ftp.get(dump.path); ftp.close();
-        state.dumpSig = sig; fs.writeFileSync(STATE, JSON.stringify(state, null, 1));
-        await publish(cfg, state, [{ name: 'welt.vwdump', data: new Uint8Array(data) }], cfg.world || 'welt');
-        return;
+        if (state.dumpSig !== sig) state.dumpSeenAt = Date.now();
+        // Mod schreibt alle paar Minuten neu – bleibt die Datei lange gleich, läuft der Mod nicht mehr → Spielstand nehmen
+        if (state.dumpSig === sig && state.dumpSeenAt && Date.now() - state.dumpSeenAt > 45 * 60e3) { log('Mod-Dump seit über 45 Min. unverändert (Mod aus?) – nutze den Spielstand.'); dump = null; }
+        else {
+          if (!FORCE && state.dumpSig === sig && state.lastUpload) { log('Mod-Dump unverändert.'); fs.writeFileSync(STATE, JSON.stringify(state, null, 1)); return; }
+          log('Lade Mod-Dump', dump.path, '(' + (dump.size / 1e6).toFixed(1) + ' MB) …');
+          const data = await ftp.get(dump.path); ftp.close();
+          state.dumpSig = sig; fs.writeFileSync(STATE, JSON.stringify(state, null, 1));
+          await publish(cfg, state, [{ name: 'welt.vwdump', data: new Uint8Array(data) }], cfg.world || 'welt');
+          return;
+        }
       }
-      if (source === 'mod') throw new Error('Kein Mod-Dump (welt.vwdump) auf dem Server gefunden. Ist "WriteDumpFile = true" in der Mod-Konfiguration gesetzt?');
+      if (source === 'mod' && !dump) throw new Error('Kein Mod-Dump (welt.vwdump) auf dem Server gefunden. Ist "WriteDumpFile = true" in der Mod-Konfiguration gesetzt?');
     }
     // 2) Spielstand (.fwl2/.db2/.chunk)
     let dir = ftpc.remoteDir && ftpc.remoteDir !== 'auto' ? ftpc.remoteDir : state.remoteDir;
