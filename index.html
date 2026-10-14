@@ -12,7 +12,7 @@
   <header>
     <div class="rune" aria-hidden="true">ᚹ</div>
     <h1>Valheim Welt-Viewer</h1>
-    <p class="lead">Verwandle deine Welt in ein 3D-Modell der ganzen erkundeten Karte mit allen Gebäuden, Kisteninhalten, Portalen und Erbauern – und teile sie als einzelne Datei.</p>
+    <p class="lead" data-en="Turn your world into a 3D model of the whole explored map with every building, chest content, portal and builder – and share it as a single file.">Verwandle deine Welt in ein 3D-Modell der ganzen erkundeten Karte mit allen Gebäuden, Kisteninhalten, Portalen und Erbauern – und teile sie als einzelne Datei.</p>
   </header>
 
   <a class="live" id="live" hidden href="#"><span class="dot" aria-hidden="true"></span><span><b id="liveName">Live-Welt</b><br><span id="liveInfo" class="small"></span></span><span class="go" id="liveGo">Live-Karte öffnen →</span></a>
@@ -31,7 +31,7 @@
 
   <details class="modbox">
     <summary>Live mit dem Mod „Valheim Welt Live“ verbinden</summary>
-    <p class="small">Läuft Valheim mit dem Mod, zeigt die Karte deine Welt und alle Spieler live. Einfach <code>http://localhost:8686</code> im Browser öffnen oder hier verbinden:</p>
+    <p class="small" data-en="When Valheim runs with the mod, the map shows your world and all players live. Just open <code>http://localhost:8686</code> in your browser or connect here:">Läuft Valheim mit dem Mod, zeigt die Karte deine Welt und alle Spieler live. Einfach <code>http://localhost:8686</code> im Browser öffnen oder hier verbinden:</p>
     <div class="btns" style="justify-content:flex-start"><input id="modUrl" class="inp" value="http://localhost:8686" aria-label="Adresse des Mods"><button class="btn pri" id="bMod">Verbinden</button></div>
   </details>
   <section class="prog" id="prog" hidden>
@@ -43,26 +43,27 @@
   <section class="cols">
     <div>
       <h2>Wo finde ich meine Welt?</h2>
-      <p><b>Windows:</b> <code>%USERPROFILE%\AppData\LocalLow\IronGate\Valheim\worlds_local</code><br>
+      <p data-en="<b>Windows:</b> <code>%USERPROFILE%\AppData\LocalLow\IronGate\Valheim\worlds_local</code><br><b>Server (e.g. Nitrado):</b> download the folder <code>worlds_local</code> or <code>.config/unity3d/IronGate/Valheim/worlds_local</code> via FTP."><b>Windows:</b> <code>%USERPROFILE%\AppData\LocalLow\IronGate\Valheim\worlds_local</code><br>
          <b>Server (z. B. Nitrado):</b> per FTP den Ordner <code>worlds_local</code> bzw. <code>.config/unity3d/IronGate/Valheim/worlds_local</code> herunterladen.</p>
-      <p>Benötigt werden die Dateien <code>&lt;Welt&gt;.fwl2</code>, <code>&lt;Welt&gt;.db2</code> und die <code>.chunk</code>-Dateien (Valheim 1.0). Am einfachsten: alles zusammen als Zip.</p>
+      <p data-en="You need the files <code>&amp;lt;World&amp;gt;.fwl2</code>, <code>&amp;lt;World&amp;gt;.db2</code> and the <code>.chunk</code> files (Valheim 1.0). Easiest: everything together as a zip.">Benötigt werden die Dateien <code>&lt;Welt&gt;.fwl2</code>, <code>&lt;Welt&gt;.db2</code> und die <code>.chunk</code>-Dateien (Valheim 1.0). Am einfachsten: alles zusammen als Zip.</p>
     </div>
     <div>
       <h2>Teilen</h2>
-      <p>Nach dem Umwandeln kannst du zwei Dateien speichern:</p>
+      <p data-en="After converting you can save two files:">Nach dem Umwandeln kannst du zwei Dateien speichern:</p>
       <ul>
-        <li><b>Teilen-Datei (.html)</b> – öffnet sich in jedem Browser per Doppelklick, auch offline und auf dem Handy. Ideal zum Verschicken.</li>
-        <li><b>.vwelt</b> – kompakte Datendatei, hier auf der Seite zu öffnen. Für Live-Karten und Server-Updates.</li>
+        <li data-en="<b>Share file (.html)</b> – opens in any browser with a double-click, even offline and on phones. Ideal for sending."><b>Teilen-Datei (.html)</b> – öffnet sich in jedem Browser per Doppelklick, auch offline und auf dem Handy. Ideal zum Verschicken.</li>
+        <li data-en="<b>.vwelt</b> – compact data file, opened here on this page. For live maps and server updates."><b>.vwelt</b> – kompakte Datendatei, hier auf der Seite zu öffnen. Für Live-Karten und Server-Updates.</li>
       </ul>
     </div>
     <div>
       <h2>Datenschutz</h2>
-      <p>Alles passiert <b>nur in deinem Browser</b>. Deine Welt wird nirgendwo hochgeladen. Was in einer geteilten Datei steht, siehst du vorher in der Ansicht „Welt &amp; Spieler“.</p>
+      <p data-en="Everything happens <b>only in your browser</b>. Your world is never uploaded. You can check what a shared file contains beforehand in the “World &amp; players” view.">Alles passiert <b>nur in deinem Browser</b>. Deine Welt wird nirgendwo hochgeladen. Was in einer geteilten Datei steht, siehst du vorher in der Ansicht „Welt &amp; Spieler“.</p>
       <p class="small">Inoffizielles Fan-Tool, nicht mit Iron Gate verbunden. Valheim ist eine Marke von Iron Gate AB.</p>
     </div>
   </section>
 </main>
 <div id="app" hidden></div>
+<script src="js/i18n.js"></script>
 <script src="lib/three.min.js"></script>
 <script src="lib/fflate.min.js"></script>
 <script src="js/data.js"></script>

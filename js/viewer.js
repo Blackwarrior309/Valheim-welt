@@ -72,7 +72,9 @@
   const CAT = { wood: [0xa8794a, 'Holz'], core: [0x7a5434, 'Kernholz/Rundholz'], floor: [0x9c7448, 'Holzboden'], roof: [0x8a4f2e, 'Holzdach'], droof: [0x3b3633, 'Teer-/Dunkelholzdach'], dark: [0x4a3a2e, 'Dunkelholz'], stone: [0xa8a49a, 'Stein'], marble: [0x2b2b30, 'Schwarzer Marmor'], iron: [0x5d6266, 'Eisen'], glass: [0x9ad7e8, 'Kristall'], chest: [0xc9953e, 'Kisten'], craft: [0xd2c06a, 'Werkbänke/Stationen'], portal: [0x7d4bd6, 'Portale'], fire: [0xff7a2a, 'Feuer'], bed: [0x4f7ad1, 'Betten'], ship: [0x6b4a2a, 'Schiffe/Karren'], misc: [0xb4a58a, 'Sonstiges'] };
   const OWNC = [0xe4572e, 0x3fa7d6, 0xf6c544, 0x7bc950, 0xb57edc, 0xf28fad, 0xaaaaaa, 0x55ddcc, 0xff9f43, 0x8395a7];
   const BOSS = { eikthyr: 'Eikthyr', gdking: 'Der Älteste', bonemass: 'Knochenmasse', dragon: 'Moder', goblinking: 'Yagluth', queen: 'Die Königin', fader: 'Fader', serpent: 'Seeschlange', writhan: 'Writhan' };
-  const fmt = (n) => Number(n).toLocaleString('de-DE');
+  const T = (s) => (g.VW_I18N ? g.VW_I18N.t(s) : s);
+  const LOC = () => (g.VW_I18N ? g.VW_I18N.locale() : 'de-DE');
+  const fmt = (n) => Number(n).toLocaleString(LOC());
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const hex = (c) => '#' + c.toString(16).padStart(6, '0');
   const b64u8 = (s) => { const b = atob(s), u = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); return u; };
@@ -106,7 +108,7 @@
         <div class="qrow"><label for="vwq-ra">Sichtweite</label><select id="vwq-ra" data-q="range"><option value="near">Nah</option><option value="mid">Mittel</option><option value="far">Weit</option></select></div>
         <div class="sub">Gezeichnet wird nur, wenn sich etwas bewegt. Schatten werden erst berechnet, wenn die Kamera kurz stillsteht, und sind im Flugmodus immer aus.</div>
       </details>
-      <h2>Ebenen</h2><div class="row layers"></div>
+      <h2 data-en="Layers">Ebenen</h2><div class="row layers"></div>
       <div class="plOnline" hidden><h2>Spieler online</h2><div class="vw-cres plList"></div></div>
       <h2>Bauplan einblenden</h2><div class="row"><select class="plSel" style="flex:1"><option value="">Plan wählen …</option></select><label class="plFile" style="cursor:pointer"><span class="vw-btnlike">Datei …</span><input type="file" accept=".vwplan,.json" hidden></label></div>
       <div class="plCtl" hidden><div class="row" style="margin-top:6px"><button data-pm="0,4">N</button><button data-pm="0,-4">S</button><button data-pm="-4,0">W</button><button data-pm="4,0">O</button><button data-pr="90">⟲ 90°</button><button data-pr="-5">↻ 5°</button><button data-pr="5">↺ 5°</button><button data-py="0.5">Höher</button><button data-py="-0.5">Tiefer</button><button class="plGo">Hinfliegen</button><button class="plDel">Entfernen</button></div><div class="sub plPos" style="margin-top:6px"></div></div>
@@ -185,10 +187,10 @@
         // Weltrand
         const [cx0, cy0] = toS(0, 0); ctx.strokeStyle = 'rgba(255,255,255,.25)'; ctx.beginPath(); ctx.arc(cx0, cy0, 10000 * view.s, 0, Math.PI * 2); ctx.stroke();
         ctx.font = '12px system-ui,sans-serif'; ctx.textAlign = 'center';
-        S.locations.forEach((l) => { const [x, y] = toS(l.x, l.z); ctx.fillStyle = l.v ? '#e8584a' : 'rgba(200,200,200,.55)'; ctx.beginPath(); ctx.moveTo(x, y - 6); ctx.lineTo(x + 5, y + 4); ctx.lineTo(x - 5, y + 4); ctx.fill(); if (view.s > 0.12 || l.k === 'StartTemple') { ctx.fillStyle = '#fff'; ctx.fillText(l.n, x, y - 9); } });
+        S.locations.forEach((l) => { const [x, y] = toS(l.x, l.z); ctx.fillStyle = l.v ? '#e8584a' : 'rgba(200,200,200,.55)'; ctx.beginPath(); ctx.moveTo(x, y - 6); ctx.lineTo(x + 5, y + 4); ctx.lineTo(x - 5, y + 4); ctx.fill(); if (view.s > 0.12 || l.k === 'StartTemple') { ctx.fillStyle = '#fff'; ctx.fillText(T(l.n), x, y - 9); } });
         S.portals.forEach((p) => { const [x, y] = toS(p.x, p.z); ctx.fillStyle = '#b48cff'; ctx.save(); ctx.translate(x, y); ctx.rotate(Math.PI / 4); ctx.fillRect(-3, -3, 6, 6); ctx.restore(); if (view.s > 0.6 && p.tag) { ctx.fillStyle = '#e6dbff'; ctx.fillText(p.tag, x, y - 7); } });
         livePlayers().forEach((p) => { const [x, y] = toS(p.x, p.z); ctx.fillStyle = '#4cc36b'; ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, y, 6, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); ctx.fillStyle = '#d9ffe3'; ctx.font = 'bold 12px system-ui,sans-serif'; ctx.fillText(p.name, x, y + 18); ctx.font = '12px system-ui,sans-serif'; });
-        S.bases.forEach((b, i) => { const [x, y] = toS(b.center[0], b.center[1]); const rr = Math.max(5, Math.min(14, 3 + Math.sqrt(b.pieces) / 8)); ctx.fillStyle = hover === i ? '#ffd27a' : '#e0a854'; ctx.strokeStyle = '#1b1408'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, y, rr, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); ctx.fillStyle = '#fff'; ctx.font = 'bold 12px system-ui,sans-serif'; ctx.fillText(b.name, x, y - rr - 4); ctx.font = '12px system-ui,sans-serif'; });
+        S.bases.forEach((b, i) => { const [x, y] = toS(b.center[0], b.center[1]); const rr = Math.max(5, Math.min(14, 3 + Math.sqrt(b.pieces) / 8)); ctx.fillStyle = hover === i ? '#ffd27a' : '#e0a854'; ctx.strokeStyle = '#1b1408'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, y, rr, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); ctx.fillStyle = '#fff'; ctx.font = 'bold 12px system-ui,sans-serif'; ctx.fillText(T(b.name), x, y - rr - 4); ctx.font = '12px system-ui,sans-serif'; });
       }
       const ptr = new Map(); let pd = 0, moved = 0;
       cv.addEventListener('pointerdown', (e) => { cv.setPointerCapture(e.pointerId); ptr.set(e.pointerId, { x: e.clientX, y: e.clientY }); moved = 0; });
@@ -585,7 +587,8 @@
       const mkMat = new THREE.MeshBasicMaterial({ color: 0xffc83d, depthTest: false, transparent: true, opacity: 0.95 }), beamMat = new THREE.MeshBasicMaterial({ color: 0xffd54a, transparent: true, opacity: 0.28, depthWrite: false, depthTest: false });
       const beamGeo = new THREE.CylinderGeometry(0.18, 0.18, 30, 8);
       let chLab = [], curQ = '';
-      const hitItem = (it, q) => q && it[0].toLowerCase().includes(q);
+      const nm = (s) => (g.VW_I18N ? g.VW_I18N.names(s) : [s]);
+      const hitItem = (it, q) => q && nm(it[0]).some((n) => n.toLowerCase().includes(q));
       function clearMarkers() { mk.clear(); chLab.forEach((l) => l.d.remove()); chLab = []; }
       function chestSearch() {
         const q = $('.cq').value.trim().toLowerCase(); curQ = q; clearMarkers(); const CR = $('.cres');
@@ -741,13 +744,13 @@
         let cs = []; if (a !== 'loose') S.regions.forEach((r, ri) => { if (a !== '' && +a !== ri) return; r.chests.forEach((c) => cs.push(Object.assign({ reg: r.name }, c))); });
         if (a === '' || a === 'loose') (S.looseChests || []).forEach((c) => cs.push(Object.assign({ reg: c.g }, c)));
         const all = cs; if (only) cs = cs.filter((c) => c.s);
-        const match = (it) => s && it[0].toLowerCase().includes(s);
+        const match = (it) => s && (g.VW_I18N ? g.VW_I18N.names(it[0]) : [it[0]]).some((n) => n.toLowerCase().includes(s));
         if (s) cs = cs.filter((c) => c.i.some(match) || c.s.toLowerCase().includes(s));
         let found = 0; cs.forEach((c) => c.i.forEach((it) => { if (match(it)) found += it[1]; }));
         const items = cs.reduce((n, c) => n + c.i.reduce((m, i) => m + i[1], 0), 0);
         $('.kstats').innerHTML = `<div class="vw-stat"><b>${fmt(cs.length)}</b><span>Kisten</span></div><div class="vw-stat"><b>${fmt(items)}</b><span>Items</span></div>` + (s ? `<div class="vw-stat"><b>${fmt(found)}</b><span>× „${esc(q.value)}“</span></div>` : `<div class="vw-stat"><b>${fmt(all.filter((c) => !c.i.length).length)}</b><span>leere Kisten</span></div>`);
         const tot = {}; all.forEach((c) => c.i.forEach((it) => (tot[it[0]] = (tot[it[0]] || 0) + it[1])));
-        let tl = Object.entries(tot).sort((x, y) => y[1] - x[1]); if (s) tl = tl.filter((t) => t[0].toLowerCase().includes(s));
+        let tl = Object.entries(tot).sort((x, y) => y[1] - x[1]); if (s) tl = tl.filter((t) => (g.VW_I18N ? g.VW_I18N.names(t[0]) : [t[0]]).some((n) => n.toLowerCase().includes(s)));
         $('.ktot').innerHTML = tl.slice(0, s ? 400 : 60).map((t) => `<tr class="click" data-i="${esc(t[0])}" style="cursor:pointer"><td>${esc(t[0])}</td><td class="n">${fmt(t[1])}</td></tr>`).join('') + (tl.length > 60 && !s ? `<tr><td colspan="2" class="sub">… ${tl.length - 60} weitere – Suche nutzen</td></tr>` : '') || '<tr><td class="sub">Nichts gefunden</td></tr>';
         $$('.ktot tr.click').forEach((tr) => (tr.onclick = () => { q.value = tr.dataset.i.replace(/ ★\d+$/, ''); render(); }));
         const groups = {}; cs.forEach((c) => (groups[c.reg] = groups[c.reg] || []).push(c));
@@ -774,7 +777,7 @@
 <h2>Welt-Einstellungen</h2><div class="sub">${mods}</div></div>
 <div class="vw-panel"><h2 style="margin-top:0">Charaktere (wer hat gebaut)</h2><table>${S.characters.map((c) => `<tr><td>${esc(c.name || '?')}${c.account ? ' <span class="sub">· ' + esc(c.account) + '</span>' : ''}${c.steam ? '<br><span class="sub">' + esc(c.steam) + '</span>' : ''}</td><td class="n">${fmt(c.pieces)}</td></tr>`).join('')}</table>
 <h2>Spieler auf dem Server</h2><table>${S.players.map((p) => `<tr><td>${esc(p.name)}${p.platform ? '<br><span class="sub">' + esc(p.platform) + '</span>' : ''}</td></tr>`).join('') || '<tr><td class="sub">–</td></tr>'}</table></div></div>
-<div class="sub" style="margin-top:16px">Snapshot vom ${new Date(S.created).toLocaleString('de-DE')} · Format v${S.version}${(S.warnings || []).length ? '<br>Hinweise: ' + S.warnings.map(esc).join(' · ') : ''}<br>Inoffizieller Fan-Viewer, nicht mit Iron Gate verbunden.</div>`;
+<div class="sub" style="margin-top:16px">Snapshot vom ${new Date(S.created).toLocaleString(LOC())} · Format v${S.version}${(S.warnings || []).length ? '<br>Hinweise: ' + S.warnings.map(esc).join(' · ') : ''}<br>Inoffizieller Fan-Viewer, nicht mit Iron Gate verbunden.</div>`;
     }
 
     function apply(newSnap, keep) {
@@ -785,6 +788,7 @@
       setTab(prevTab);
     }
     apply(snap, false);
+    if (g.VW_I18N) g.VW_I18N.onChange(() => { try { info(); if (tab === 'map') map.draw(); } catch (e) { } });
     if (snap.plans && snap.plans.length) three.setPlans(snap.plans);
     requestAnimationFrame(() => { map.build(); map.draw(); });
     function updateLive(players) { LIVE = players; three.drawPlayers(); if (tab === 'map') map.draw(); }

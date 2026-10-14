@@ -56,7 +56,7 @@
     try {
       viewer && viewer.setStatus('Erzeuge Teilen-Datei …');
       const get = (p) => fetch(p).then((r) => { if (!r.ok) throw new Error(p + ' nicht ladbar'); return r.text(); });
-      const [three, ff, data, view] = await Promise.all([get('lib/three.min.js'), get('lib/fflate.min.js'), get('js/data.js'), get('js/viewer.js')]);
+      const [three, ff, data, view, i18n] = await Promise.all([get('lib/three.min.js'), get('lib/fflate.min.js'), get('js/data.js'), get('js/viewer.js'), get('js/i18n.js')]);
       const js = (s) => s.replace(/<\/script/gi, '<\\/script');
       const title = (current.world.name || 'Valheim-Welt') + ' – Valheim-Welt';
       const html = `<!doctype html>
@@ -66,6 +66,7 @@
 <style>html,body{margin:0;height:100%;background:#12171b}#boot{color:#ece6d8;font:15px/1.5 system-ui,sans-serif;padding:24px;max-width:560px}#boot .h{opacity:0;animation:vwshow 0s 8s forwards;color:#c9c2b4;font-size:14px;margin-top:14px}@keyframes vwshow{to{opacity:1}}#boot .e{color:#ff9a8a;white-space:pre-wrap}</style>
 </head><body><div id="app"><div id="boot"><b>Lade Welt …</b><div class="h">Bleibt diese Meldung stehen? Dann wurde die Datei in einer Vorschau geöffnet, die keine Programme ausführt (z. B. Datei-Vorschau in Apps, Mail, WhatsApp). Bitte die Datei herunterladen und in einem Browser öffnen – Chrome, Edge, Firefox oder Safari.</div><div class="e" id="booterr"></div></div></div>
 <script>window.onerror=function(m,s,l){var e=document.getElementById('booterr');if(e)e.textContent='Fehler: '+m+' (Zeile '+l+')';};</script>
+<script>${js(i18n)}</script>
 <script>${js(three)}</script>
 <script>${js(ff)}</script>
 <script>${js(data)}</script>
@@ -75,7 +76,7 @@
 (function(){ try {
   var b=document.getElementById('vwelt').textContent.trim(),s=atob(b),u=new Uint8Array(s.length);for(var i=0;i<s.length;i++)u[i]=s.charCodeAt(i);
   var snap=JSON.parse(fflate.strFromU8(fflate.gunzipSync(u)));
-  VWViewer.mount(document.getElementById('app'),snap,{status:'Geteilte Welt · Stand '+new Date(snap.created).toLocaleDateString('de-DE'),actions:[{label:'⬇ .vwelt',onClick:function(){var a=document.createElement('a');a.href=URL.createObjectURL(new Blob([u],{type:'application/gzip'}));a.download=(snap.world.name||'welt')+'.vwelt';a.click();}}]});
+  VWViewer.mount(document.getElementById('app'),snap,{status:'Geteilte Welt · Stand '+new Date(snap.created).toLocaleDateString(window.VW_I18N?VW_I18N.locale():'de-DE'),actions:[{label:'⬇ .vwelt',onClick:function(){var a=document.createElement('a');a.href=URL.createObjectURL(new Blob([u],{type:'application/gzip'}));a.download=(snap.world.name||'welt')+'.vwelt';a.click();}}]});
  } catch(e) { var x=document.getElementById('booterr'); if(x) x.textContent='Fehler beim Laden: '+(e&&e.message||e); } })();
 </script>
 </body></html>`;
@@ -118,7 +119,7 @@
       for (const f of keep) files.push({ name: f.webkitRelativePath || f.name, buf: await f.arrayBuffer() });
       const res = await convert(files);
       prog.hidden = true;
-      show(res.snap, res.gz, `${res.snap.stats.zdos.toLocaleString('de-DE')} Objekte gelesen`);
+      show(res.snap, res.gz, `${res.snap.stats.zdos.toLocaleString(window.VW_I18N?VW_I18N.locale():'de-DE')} Objekte gelesen`);
     } catch (e) { prog.hidden = true; showErr('Fehler: ' + e.message); }
   }
 
@@ -162,7 +163,7 @@
         if (!files.length) { showErr('Im gewählten Ordner sind keine Welt-Dateien.'); return; }
         const res = await convert(await Promise.all(files.map(async (x) => ({ name: x.name, buf: await x.f.arrayBuffer() }))));
         prog.hidden = true;
-        show(res.snap, res.gz, 'Live · Ordner beobachtet · aktualisiert ' + new Date().toLocaleTimeString('de-DE'));
+        show(res.snap, res.gz, 'Live · Ordner beobachtet · aktualisiert ' + new Date().toLocaleTimeString(window.VW_I18N?VW_I18N.locale():'de-DE'));
       } catch (e) { showErr('Fehler: ' + e.message); }
     }
     setProg('Lese Ordner …', 0.02); await tick(); setInterval(tick, 30000);
@@ -184,7 +185,7 @@
         const buf = await r.arrayBuffer(); lastDump = info.dumpTime;
         const res = await convert([{ name: 'live.vwdump', buf }]);
         prog.hidden = true; fails = 0;
-        show(res.snap, res.gz, 'Live (Mod) · Welt ' + new Date(info.dumpTime).toLocaleTimeString('de-DE'));
+        show(res.snap, res.gz, 'Live (Mod) · Welt ' + new Date(info.dumpTime).toLocaleTimeString(window.VW_I18N?VW_I18N.locale():'de-DE'));
       } catch (e) { fails++; if (!viewer) { prog.hidden = true; showErr('Mod nicht erreichbar (' + (base || location.host) + '): ' + e.message + '. Läuft Valheim mit dem Mod? Port richtig?'); } else viewer.setStatus('Live (Mod) · Verbindung unterbrochen …'); }
       finally { busy = false; }
     }
@@ -210,7 +211,7 @@
       const { snap } = decodeSnapshot(new Uint8Array(buf)); if (!snap || snap.format !== 'vwelt') return;
       const box = $('#live'); box.hidden = false;
       $('#liveName').textContent = snap.world.name || 'Live-Welt';
-      $('#liveInfo').textContent = 'Stand ' + new Date(snap.created).toLocaleString('de-DE') + ' · ' + (snap.bases || []).length + ' Basen · ' + ((snap.stats && snap.stats.playerPieces) || 0).toLocaleString('de-DE') + ' Bauteile';
+      $('#liveInfo').textContent = 'Stand ' + new Date(snap.created).toLocaleString(window.VW_I18N?VW_I18N.locale():'de-DE') + ' · ' + (snap.bases || []).length + ' Basen · ' + ((snap.stats && snap.stats.playerPieces) || 0).toLocaleString(window.VW_I18N?VW_I18N.locale():'de-DE') + ' Bauteile';
       box.href = '?src=live/welt.vwelt&refresh=300';
     }).catch(() => {});
   }
@@ -223,9 +224,9 @@
         const r = await fetch(src + (src.includes('?') ? '&' : '?') + '_=' + Date.now(), { cache: 'no-store' });
         if (!r.ok) throw new Error('HTTP ' + r.status);
         const { snap, gz } = decodeSnapshot(new Uint8Array(await r.arrayBuffer())); checkSnap(snap);
-        const t = new Date().toLocaleTimeString('de-DE');
-        if (snap.created !== lastCreated) { lastCreated = snap.created; show(snap, gz, (P.get('refresh') ? 'Live · ' : '') + 'Stand ' + new Date(snap.created).toLocaleString('de-DE')); }
-        else if (viewer) viewer.setStatus('Live · Stand ' + new Date(snap.created).toLocaleString('de-DE') + ' · geprüft ' + t);
+        const t = new Date().toLocaleTimeString(window.VW_I18N?VW_I18N.locale():'de-DE');
+        if (snap.created !== lastCreated) { lastCreated = snap.created; show(snap, gz, (P.get('refresh') ? 'Live · ' : '') + 'Stand ' + new Date(snap.created).toLocaleString(window.VW_I18N?VW_I18N.locale():'de-DE')); }
+        else if (viewer) viewer.setStatus('Live · Stand ' + new Date(snap.created).toLocaleString(window.VW_I18N?VW_I18N.locale():'de-DE') + ' · geprüft ' + t);
       } catch (e) { if (first) { prog.hidden = true; showErr('Quelle nicht ladbar (' + src + '): ' + e.message); } else if (viewer) viewer.setStatus('Live · Verbindung fehlgeschlagen, neuer Versuch …'); }
     }
     setProg('Lade Welt …', 0.3); pull(true).then(() => (prog.hidden = true));

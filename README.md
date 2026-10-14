@@ -31,6 +31,7 @@ Am hilfreichsten sind Screenshots, einmal im Spiel und einmal im Viewer aus ähn
 index.html, css/, js/, lib/, plans/   die Webseite (statisch, GitHub Pages)
   js/convert.js                       Spielstand/Mod-Dump → .vwelt (Browser und Node)
   js/viewer.js                        Anzeige: Karte, 3D, Kisten, Welt & Spieler
+  js/i18n.js                          Sprache: Deutsch/Englisch (Umschalter oben rechts, ?lang=en)
   plans/                              Baupläne (Grasland-Halle)
 sync/                                 Valheim-Sync: FTP (Nitrado) → umwandeln → hier ins Repo hochladen
 mod/                                  Begleit-Mod „Valheim Welt Live“ (BepInEx, C#-Quellcode + build.bat)
