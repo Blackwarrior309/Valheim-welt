@@ -23,7 +23,8 @@ namespace ValheimWeltLive
     {
         public const string Guid = "de.valheimweltviewer.live";
         public const string Name = "Valheim Welt Live";
-        public const string Version = "0.1.0";
+        public const string Version = "0.2.0";
+        static bool loggedFile;
 
         ConfigEntry<bool> cfgHttp, cfgBindAll, cfgWriteFile, cfgStrip;
         ConfigEntry<int> cfgPort, cfgWorldSeconds;
@@ -49,17 +50,17 @@ namespace ValheimWeltLive
 
         void Awake()
         {
-            cfgHttp = Config.Bind("Web", "Enabled", true, "Eingebaute Webseite/Schnittstelle starten.");
-            cfgPort = Config.Bind("Web", "Port", 8686, "Port der Webseite (http://localhost:PORT/).");
-            cfgBindAll = Config.Bind("Web", "BindAll", false, "true = auch aus dem Netzwerk erreichbar (Server/LAN). Unter Windows ggf. Adminrechte/URL-Reservierung nötig.");
-            cfgWorldSeconds = Config.Bind("Daten", "WorldIntervalSeconds", 30, "Wie oft die ganze Welt neu ausgelesen wird (Sekunden, min. 10).");
-            cfgPlayerSeconds = Config.Bind("Daten", "PlayerIntervalSeconds", 1f, "Wie oft Spielerpositionen aktualisiert werden (Sekunden).");
-            cfgWriteFile = Config.Bind("Datei", "WriteDumpFile", false, "Dump zusätzlich als Datei schreiben (für FTP-Sync, z. B. Nitrado). Auf Servern auf true setzen.");
-            cfgFilePath = Config.Bind("Datei", "DumpPath", "", "Leer = BepInEx/config/ValheimWeltLive/welt.vwdump");
-            cfgStrip = Config.Bind("Datenschutz", "StripSteamIds", true, "Steam-IDs (Schild-/Portal-Autoren) nicht ausgeben.");
+            cfgHttp = Config.Bind("Web", "Enabled", true, "Start the built-in web page/API.");
+            cfgPort = Config.Bind("Web", "Port", 8686, "Port of the web page (http://localhost:PORT/).");
+            cfgBindAll = Config.Bind("Web", "BindAll", false, "true = reachable from the network too (server/LAN). On Windows this may need admin rights or a URL reservation.");
+            cfgWorldSeconds = Config.Bind("Daten", "WorldIntervalSeconds", 30, "How often the whole world is read again (seconds, min. 10). Servers: 300.");
+            cfgPlayerSeconds = Config.Bind("Daten", "PlayerIntervalSeconds", 1f, "How often player positions are updated (seconds).");
+            cfgWriteFile = Config.Bind("Datei", "WriteDumpFile", false, "Also write the world dump to a file (for FTP sync, e.g. Nitrado). Set to true on servers.");
+            cfgFilePath = Config.Bind("Datei", "DumpPath", "", "Empty = BepInEx/config/ValheimWeltLive/welt.vwdump");
+            cfgStrip = Config.Bind("Datenschutz", "StripSteamIds", true, "Do not output Steam IDs (authors of signs/portals).");
             webRoot = Path.Combine(Path.GetDirectoryName(Info.Location) ?? ".", "web");
             if (cfgHttp.Value) StartHttp();
-            Logger.LogInfo($"{Name} {Version} geladen. Web: {(cfgHttp.Value ? "http://localhost:" + cfgPort.Value + "/" : "aus")}");
+            Logger.LogInfo($"{Name} {Version} loaded. Web: {(cfgHttp.Value ? "http://localhost:" + cfgPort.Value + "/" : "off")}, dump file: {(cfgWriteFile.Value ? "on" : "off")}");
         }
 
         void OnDestroy()
@@ -101,7 +102,7 @@ namespace ValheimWeltLive
                 if (WorldGenerator.instance == null) { biomeBusy = false; yield break; }
             }
             biomeGrid = g; biomeWorld = w; biomeBusy = false;
-            Logger.LogInfo("Biom-Raster berechnet (" + BIO_N + "×" + BIO_N + ").");
+            Logger.LogInfo("Biome grid computed (" + BIO_N + "×" + BIO_N + ").");
         }
 
         // ---------------- aufgedeckte Karte ----------------
@@ -149,9 +150,9 @@ namespace ValheimWeltLive
             var locs = new List<KeyValuePair<string, Vector3>>(); var locPlaced = new List<bool>();
             // ZDO-Liste kopieren und in kleinen Portionen (je Frame 16384 Objekte) auslesen – kein Ruckler für Spieler
             var dict = GetZdoDict();
-            if (dict == null) { Logger.LogWarning("ZDOs nicht gefunden (Spielversion geändert?)"); building = false; yield break; }
+            if (dict == null) { Logger.LogWarning("ZDOs not found (game version changed?)"); building = false; yield break; }
             ZDO[] all = null;
-            try { all = new ZDO[dict.Count]; dict.Values.CopyTo(all, 0); } catch (Exception e) { Logger.LogWarning("ZDO-Liste: " + e.Message); }
+            try { all = new ZDO[dict.Count]; dict.Values.CopyTo(all, 0); } catch (Exception e) { Logger.LogWarning("ZDO list: " + e.Message); }
             if (all == null) { building = false; yield break; }
             recs = new List<Rec>(all.Length);
             bool strip = cfgStrip.Value;
@@ -184,10 +185,10 @@ namespace ValheimWeltLive
                 world = ZNet.instance.GetWorldName() ?? "";
                 try { var w = typeof(ZNet).GetField("m_world", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Static | BindingFlags.Instance)?.GetValue(ZNet.instance) as World; if (w != null) seed = w.m_seedName ?? ""; } catch { }
                 try { keys = ZoneSystem.instance.GetGlobalKeys(); } catch { }
-                try { CollectLocations(locs, locPlaced); } catch (Exception e) { Logger.LogDebug("Orte: " + e.Message); }
-                try { explored = CollectExplored(out expSize, out expPixel); } catch (Exception e) { explored = null; Logger.LogDebug("Karte: " + e.Message); }
+                try { CollectLocations(locs, locPlaced); } catch (Exception e) { Logger.LogDebug("Locations: " + e.Message); }
+                try { explored = CollectExplored(out expSize, out expPixel); } catch (Exception e) { explored = null; Logger.LogDebug("Map: " + e.Message); }
             }
-            catch (Exception e) { Logger.LogError("Dump fehlgeschlagen: " + e); building = false; yield break; }
+            catch (Exception e) { Logger.LogError("Dump failed: " + e); building = false; yield break; }
 
             // Schreiben im Hintergrund, damit das Spiel nicht ruckelt
             long now = (long)(DateTime.UtcNow - new DateTime(1970, 1, 1)).TotalMilliseconds;
@@ -229,13 +230,14 @@ namespace ValheimWeltLive
                         File.WriteAllBytes(path + ".tmp", dumpGz); // gzip-komprimiert (VWD1 innen)
                         if (File.Exists(path)) File.Delete(path);
                         File.Move(path + ".tmp", path);
+                        if (!loggedFile) { loggedFile = true; Logger.LogInfo($"World dump written: {recs.Count} objects, {dumpGz.Length / 1024} KB -> {path}"); }
                     }
                 }
-                catch (Exception e) { Logger.LogError("Dump schreiben: " + e.Message); }
+                catch (Exception e) { Logger.LogError("Writing dump: " + e.Message); }
                 finally { done = true; }
             });
             while (!done) yield return null;
-            Logger.LogDebug($"Dump: {recs.Count} Objekte, {(dumpGz?.Length ?? 0) / 1024} KB");
+            Logger.LogDebug($"Dump: {recs.Count} objects, {(dumpGz?.Length ?? 0) / 1024} KB");
             building = false;
         }
 
@@ -274,7 +276,7 @@ namespace ValheimWeltLive
                 httpThread = new Thread(HttpLoop) { IsBackground = true, Name = "ValheimWeltLive-HTTP" };
                 httpThread.Start();
             }
-            catch (Exception e) { Logger.LogError("Webserver konnte nicht starten: " + e.Message + " (Port belegt? BindAll braucht ggf. Adminrechte)"); }
+            catch (Exception e) { Logger.LogError("Web server could not start: " + e.Message + " (port in use? BindAll may need admin rights)"); }
         }
 
         void HttpLoop()

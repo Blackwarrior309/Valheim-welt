@@ -3,7 +3,9 @@
 Begleit-Mod für den Welt-Viewer. Er liest die Welt **direkt aus dem laufenden Spiel bzw. Server** und zeigt sie live im Browser:
 3D-Karte, Kisten, Portale, Erbauer und **Spielerpositionen in Echtzeit**. Auf dem zweiten Bildschirm einfach `http://localhost:8686` öffnen.
 
-> Status: erste Version, kompiliert, aber noch **nicht im echten Spiel getestet**. Die Spiel-Schnittstellen (ZDOMan, ZDO, ZNet) können sich mit Updates ändern. Falls etwas nicht klappt: `BepInEx/LogOutput.log` ansehen.
+> Status 0.2.0: lokal im Spiel getestet (Welt, Biome, erkundete Gebiete, Spieler live). Auf dedizierten Servern noch ungetestet. Die Spiel-Schnittstellen (ZDOMan, ZDO, ZNet) können sich mit Updates ändern. Falls etwas nicht klappt: `BepInEx/LogOutput.log` ansehen.
+>
+> English: [thunderstore/README.md](thunderstore/README.md)
 
 ## Bauen
 
@@ -12,6 +14,8 @@ Voraussetzungen: Valheim mit **BepInEx** (z. B. „BepInExPack Valheim“ von Th
 ```bat
 mod\build.bat "C:\Program Files (x86)\Steam\steamapps\common\Valheim" install
 ```
+
+Oder per r2modman/Thunderstore installieren (Paket: `tools/package-mod.sh` → `dist/`).
 
 `build.bat` baut die DLL, packt die Webseite dazu und kopiert alles nach `Valheim\BepInEx\plugins\ValheimWeltLive\`. Ohne das Wort `install` wird nur das Paket unter `mod\paket\` erstellt.
 
@@ -27,19 +31,22 @@ Auch die GitHub-Seite kann sich verbinden: *„Live mit dem Mod verbinden“* �
 
 Auf dem Server wird meist kein Port für eine Webseite freigegeben. Deshalb schreibt der Mod die Welt als Datei, und das **Valheim-Sync-Programm** holt sie per FTP und lädt sie zu GitHub hoch.
 
-1. Prüfen, ob der Server BepInEx unterstützt. Bei Nitrado gibt es dafür meist eine Mod-/BepInEx-Option. Dann den Ordner `ValheimWeltLive` per FTP nach `BepInEx/plugins/` laden.
-2. Server einmal starten. Danach in `BepInEx/config/de.valheimweltviewer.live.cfg` folgende Werte setzen:
+Ausführliche Anleitung: [docs/SERVER.md](../docs/SERVER.md#deutsch). Fertiges Paket: `tools/package-mod.sh <dll>` → `dist/ValheimWeltLive-Server-<version>.zip` (DLL + fertige Config aus `mod/server/`).
+
+1. BepInEx auf dem Server einschalten (bei Nitrado meist eine Mod-/BepInEx-Option), dann `ValheimWeltLive.dll` per FTP nach `BepInEx/plugins/ValheimWeltLive/` laden.
+2. Config `BepInEx/config/de.valheimweltviewer.live.cfg` mit diesen Werten hochladen (liegt im Server-Paket):
    ```
    [Datei]
    WriteDumpFile = true
    [Datenschutz]
    StripSteamIds = true
    [Daten]
-   WorldIntervalSeconds = 120
+   WorldIntervalSeconds = 300
+   PlayerIntervalSeconds = 5
    [Web]
    Enabled = false
    ```
-3. Der Mod schreibt jetzt alle 2 Minuten `BepInEx/config/ValheimWeltLive/welt.vwdump`. Valheim-Sync findet die Datei automatisch.
+3. Der Mod schreibt jetzt alle 5 Minuten `BepInEx/config/ValheimWeltLive/welt.vwdump`. Valheim-Sync findet die Datei automatisch.
 
 ## Einstellungen (`BepInEx/config/de.valheimweltviewer.live.cfg`)
 
