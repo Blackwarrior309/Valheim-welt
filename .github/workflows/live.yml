@@ -59,7 +59,8 @@ jobs:
           VS_STRIP_IDS: 'true'      # Repo ist öffentlich → keine Steam-IDs
           VS_DATA: ${{ runner.temp }}/sync-data
           VS_OUT: ${{ runner.temp }}/sync-data/letzter-stand.vwelt
-        run: node sync/sync.cjs
+        # bei Änderungen am Repo/manuellem Start neu umwandeln (neue Viewer-/Konverter-Version), sonst nur bei neuem Spielstand
+        run: node sync/sync.cjs ${{ github.event_name != 'schedule' && '--force' || '' }}
 
       - name: Letzten Stand in die Seite legen
         run: |
