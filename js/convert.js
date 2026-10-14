@@ -141,6 +141,13 @@
       visit(prefab, x, y, z, yaw, scale, Lm, S, B);
     }
     meta.count = nz;
+    // optionale Zusatzabschnitte: EXPL = aufgedeckte Karte (Spiel-Client), BIOM = Biom-Raster aus dem Weltgenerator
+    while (r.p + 16 <= u8.length) {
+      const tag = String.fromCharCode(u8[r.p], u8[r.p + 1], u8[r.p + 2], u8[r.p + 3]);
+      if (tag === 'EXPL') { r.skip(4); const size = r.i32(), pixel = r.f32(), len = r.i32(); meta.explored = { size, pixel, bits: r.bytes(len) }; }
+      else if (tag === 'BIOM') { r.skip(4); const n = r.i32(), res = r.f32(), x0 = r.f32(), len = r.i32(); meta.biomes = { n, res, x0, z0: x0, b: r.bytes(len) }; }
+      else break;
+    }
     return meta;
   }
 
@@ -229,15 +236,39 @@
           const name = PREF[prefab];
           const cr = L ? L[K.creator] : undefined;
           if (cr !== undefined || (name && SPEC[name])) pieces.push([x, y, z, yaw, prefab, cr !== undefined ? cr.toString() : '']);
-          if (GROUND.has(prefab)) pushG(x, y, z);
+          // Bodenhöhe: bekannte Pflanzen/Steine und jedes andere natürliche Objekt (nicht gebaut) – so klappt es in allen Biomen (z. B. Aschelande)
+          if (GROUND.has(prefab) || (cr === undefined && !(name && SPEC[name]) && !H_PORTAL.has(prefab))) pushG(x, y, z);
           const nk = NAT[prefab]; if (nk) nature.push([nk, x, y, z, yaw, scale]);
+          if (cr === undefined) { const bh = hintOf(prefab); if (bh) { const k = Math.floor(x / BR) + ',' + Math.floor(z / BR); let v = bioVotes.get(k); if (!v) bioVotes.set(k, (v = new Uint16Array(10))); v[bh]++; } }
           if (H_PORTAL.has(prefab)) portals.push({ tag: (S && S[K.tag]) || '', x, y, z });
           else if (prefab === H_SIGN && S && S[K.text]) signs.push({ x, y, z, t: clean(S[K.text]), a: S[K.author] || '', an: S[K_AUTHOR_NAME] || '', c: cr !== undefined ? cr.toString() : '' });
           else if (H_BED.has(prefab) && S && S[K.ownerName]) beds.push({ x, y, z, n: S[K.ownerName], o: L && L[K.owner] !== undefined ? L[K.owner].toString() : '' });
           else if (prefab === H_TOMB) tombs.push({ x, y, z, n: (S && S[K.ownerName]) || '' });
           if (CONT[prefab] && B && B[K.items]) { try { conts.push({ x, y, z, t: CONT[prefab], c: cr !== undefined ? cr.toString() : '', inv: parseInv(B[K.items]) }); } catch (e) { } }
     };
-    let live = null;
+    let live = null, EXP = null, BIO = null;
+    // Biome: 1 Wiesen, 2 Sumpf, 3 Berge, 4 Schwarzwald, 5 Ebenen, 6 Aschelande, 7 Tiefer Norden, 8 Meer, 9 Nebellande
+    const BR = 64, bioHint = new Map(), bioVotes = new Map();
+    const hintOf = (prefab) => {
+      if (bioHint.has(prefab)) return bioHint.get(prefab);
+      const n = PREF[prefab] || ''; let b = 0;
+      if (/^(Beech|Oak|Pickable_Dandelion|Raspberry)/.test(n)) b = 1;
+      else if (/^SwampTree|swamp/i.test(n)) b = 2;
+      else if (/_mountain$|^Pickable_Mountain|^silvervein/i.test(n)) b = 3;
+      else if (/^(FirTree|Pinetree|rock4_forest|Blueberry|Pickable_Thistle)/.test(n)) b = 4;
+      else if (/_heath$|_plains$|^Cloudberry|^Pickable_Barley/i.test(n)) b = 5;
+      else if (/^Ashland|^Charred|^Pickable_.*Ash/i.test(n)) b = 6;
+      else if (/^Ygga|^Mistlands|^Pickable_Mushroom_(Magecap|JotunPuffs)/i.test(n)) b = 9;
+      bioHint.set(prefab, b); return b;
+    };
+    // aufgedeckte Karte: Bit (x,z) gesetzt? (Valheim Minimap: Pixel = Welt/pixelSize + Größe/2)
+    const expAt = (x, z) => { const S = EXP.size, px = Math.floor(x / EXP.pixel + S / 2), py = Math.floor(z / EXP.pixel + S / 2); if (px < 0 || py < 0 || px >= S || py >= S) return false; const b = py * S + px; return (EXP.bits[b >> 3] >> (b & 7)) & 1; };
+    function expBounds() { // Weltkoordinaten-Rahmen aller aufgedeckten Pixel
+      const S = EXP.size; let a = S, b = -1, c = S, d = -1;
+      for (let py = 0; py < S; py++) { const row = py * S; for (let px = 0; px < S; px += 8) { const by = EXP.bits[(row + px) >> 3]; if (!by) continue; for (let k = 0; k < 8; k++) if ((by >> k) & 1) { const x = px + k; if (x < a) a = x; if (x > b) b = x; if (py < c) c = py; if (py > d) d = py; } } }
+      if (b < 0) return null; const P = EXP.pixel;
+      return { x0: (a - S / 2) * P, x1: (b + 1 - S / 2) * P, z0: (c - S / 2) * P, z1: (d + 1 - S / 2) * P };
+    }
     if (dumps.length) {
       // Live-Dump vom Mod hat Vorrang (aktueller Speicherstand des Spiels)
       const f = dumps.sort((a, b) => b.data.length - a.data.length)[0];
@@ -246,6 +277,8 @@
       if (!fwl) { world.name = meta.world || world.name; world.seedName = meta.seed || world.seedName; }
       if (!db) { dbi = { keys: meta.keys, locations: meta.locations }; warnings.splice(warnings.indexOf('Keine .db2 gefunden – Bosse/Orte fehlen.'), 1); }
       live = { time: meta.time, players: meta.live.map((p) => ({ name: p.name, x: r1(p.x), y: r1(p.y), z: r1(p.z) })) };
+      if (meta.explored && meta.explored.size > 0) EXP = meta.explored;
+      if (meta.biomes && meta.biomes.n > 0) BIO = meta.biomes;
       prog('Live-Dump gelesen', 0.65);
     } else chunks.forEach((f, i) => {
       try {
@@ -303,8 +336,9 @@
         known = new Uint8Array(cw * ch); for (let i = 0; i < c.length; i++) known[i] = isNaN(c[i]) ? 0 : 1;
         for (let it = 0; it < 2; it++) { const k2 = known.slice(); for (let j = 0; j < ch; j++) for (let i = 0; i < cw; i++) if (!known[j * cw + i]) { for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) { const x = i + di, y = j + dj; if (x >= 0 && y >= 0 && x < cw && y < ch && known[y * cw + x]) k2[j * cw + i] = 1; } } known = k2; }
       }
+      if (known && EXP) for (let j = 0; j < ch; j++) for (let i = 0; i < cw; i++) if (!known[j * cw + i] && expAt(x0 + (i + 0.5) * cr, z0 + (j + 0.5) * cr)) known[j * cw + i] = 2; // aufgedeckt, ohne Pflanzen in der Nähe → Wasser
       fillGrid(c, cw, ch);
-      if (known) for (let i = 0; i < c.length; i++) if (!known[i]) c[i] = WATER - 25;
+      if (known) for (let i = 0; i < c.length; i++) { if (!known[i]) c[i] = WATER - 25; else if (known[i] === 2) c[i] = WATER - 10; }
       const o = new Float32Array(w * h);
       for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) {
         const fx = Math.min(cw - 1.001, Math.max(0, (i * res) / cr - 0.5)), fy = Math.min(ch - 1.001, Math.max(0, (j * res) / cr - 0.5));
@@ -375,11 +409,12 @@
     clusters.slice(0, maxRegions).forEach((cl, i) => { regions.push(regionFor(cl, i)); prog('Basis ' + (i + 1) + '/' + Math.min(maxRegions, clusters.length), 0.72 + 0.2 * (i + 1) / Math.min(maxRegions, clusters.length)); });
     // Ganze erkundete Welt als ein 3D-Modell (16-m-Gelände, alle Bauteile, Natur ausgedünnt)
     let world3d = null;
-    if (gn) {
+    if (gn || EXP) {
       prog('Ganze Welt in 3D …', 0.92);
       let wx0 = 1e9, wx1 = -1e9, wz0 = 1e9, wz1 = -1e9;
       for (let i = 0; i < gn; i++) { const x = ground[i * 3], z = ground[i * 3 + 2]; if (x < wx0) wx0 = x; if (x > wx1) wx1 = x; if (z < wz0) wz0 = z; if (z > wz1) wz1 = z; }
       pieces.forEach((p) => { if (p[0] < wx0) wx0 = p[0]; if (p[0] > wx1) wx1 = p[0]; if (p[2] < wz0) wz0 = p[2]; if (p[2] > wz1) wz1 = p[2]; });
+      const EB = EXP ? expBounds() : null; if (EB) { wx0 = Math.min(wx0, EB.x0); wx1 = Math.max(wx1, EB.x1); wz0 = Math.min(wz0, EB.z0); wz1 = Math.max(wz1, EB.z1); }
       const WR = opts.worldRes || 16;
       wx0 = Math.floor(wx0 / 64) * 64 - 64; wz0 = Math.floor(wz0 / 64) * 64 - 64; wx1 = Math.ceil(wx1 / 64) * 64 + 64; wz1 = Math.ceil(wz1 / 64) * 64 + 64;
       const nP = pieces.filter((p) => p[5]).length;
@@ -397,12 +432,30 @@
     prog('Übersichtskarte …', 0.94);
     let ox0 = 1e9, ox1 = -1e9, oz0 = 1e9, oz1 = -1e9;
     for (let i = 0; i < gn; i++) { const x = ground[i * 3], z = ground[i * 3 + 2]; if (x < ox0) ox0 = x; if (x > ox1) ox1 = x; if (z < oz0) oz0 = z; if (z > oz1) oz1 = z; }
+    const OEB = EXP ? expBounds() : null; if (OEB) { ox0 = Math.min(ox0, OEB.x0); ox1 = Math.max(ox1, OEB.x1); oz0 = Math.min(oz0, OEB.z0); oz1 = Math.max(oz1, OEB.z1); }
     const OR = 32; ox0 = Math.floor(ox0 / OR) * OR - OR; oz0 = Math.floor(oz0 / OR) * OR - OR;
     const onx = Math.ceil((ox1 - ox0) / OR) + 2, onz = Math.ceil((oz1 - oz0) / OR) + 2;
     const ov = new Float32Array(onx * onz).fill(NaN);
     for (let i = 0; i < gn; i++) { const ci = Math.floor((ground[i * 3] - ox0) / OR), cj = Math.floor((ground[i * 3 + 2] - oz0) / OR); const k = cj * onx + ci; const y = ground[i * 3 + 1]; if (y < 400 && !(ov[k] <= y)) ov[k] = y; }
     const ou = new Uint8Array(onx * onz);
     for (let i = 0; i < ou.length; i++) ou[i] = isNaN(ov[i]) ? 0 : Math.max(1, Math.min(255, Math.round(ov[i] - WATER) + 100));
+    if (EXP) for (let j = 0; j < onz; j++) for (let i = 0; i < onx; i++) { const k = j * onx + i; if (!ou[k] && expAt(ox0 + (i + 0.5) * OR, oz0 + (j + 0.5) * OR)) ou[k] = 80; } // aufgedeckt, ohne Pflanzen → Wasser
+
+    // Biom-Raster (64 m) über die Übersicht: exakt vom Mod, sonst aus Objekten geschätzt
+    let biomes = null;
+    {
+      const bx0 = Math.floor(ox0 / BR) * BR, bz0 = Math.floor(oz0 / BR) * BR, bnx = Math.ceil((onx * OR + (ox0 - bx0)) / BR) + 1, bnz = Math.ceil((onz * OR + (oz0 - bz0)) / BR) + 1;
+      const bb = new Uint8Array(bnx * bnz); let src = 'geschätzt';
+      if (BIO) {
+        src = 'Weltgenerator';
+        for (let j = 0; j < bnz; j++) for (let i = 0; i < bnx; i++) { const gi = Math.floor((bx0 + (i + 0.5) * BR - BIO.x0) / BIO.res), gj = Math.floor((bz0 + (j + 0.5) * BR - BIO.z0) / BIO.res); if (gi >= 0 && gj >= 0 && gi < BIO.n && gj < BIO.n) bb[j * bnx + i] = BIO.b[gj * BIO.n + gi]; }
+      } else {
+        for (const [k, v] of bioVotes) { const [ci, cj] = k.split(',').map(Number); const i = ci - bx0 / BR, j = cj - bz0 / BR; if (i < 0 || j < 0 || i >= bnx || j >= bnz) continue; let best = 0; for (let t = 1; t < 10; t++) if (v[t] > v[best]) best = t; bb[j * bnx + i] = best; }
+        for (let it = 0; it < 4; it++) { const c = bb.slice(); for (let j = 0; j < bnz; j++) for (let i = 0; i < bnx; i++) { if (c[j * bnx + i]) continue; const cnt = new Uint8Array(10); for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) { const a = i + di, b2 = j + dj; if (a >= 0 && b2 >= 0 && a < bnx && b2 < bnz && c[b2 * bnx + a]) cnt[c[b2 * bnx + a]]++; } let best = 0; for (let t = 1; t < 10; t++) if (cnt[t] > cnt[best]) best = t; if (best) bb[j * bnx + i] = best; } }
+        for (let j = 0; j < bnz; j++) for (let i = 0; i < bnx; i++) { const k = j * bnx + i; if (bb[k]) continue; const z = bz0 + (j + 0.5) * BR; bb[k] = z < -6000 ? 6 : z > 7000 ? 7 : 1; } // grobe Lage: Süden Aschelande, Norden Tiefer Norden
+      }
+      biomes = { x0: bx0, z0: bz0, res: BR, nx: bnx, nz: bnz, b: b64(bb), src };
+    }
 
     const strip = !!opts.stripIds;
     const snap = {
@@ -415,6 +468,7 @@
       portals: portals.map((p) => ({ tag: p.tag, x: Math.round(p.x), z: Math.round(p.z) })),
       bases: regions.map((r) => ({ id: r.id, name: r.name, center: r.center, pieces: r.pieceCount, chests: r.chests.length, builders: r.builders.slice(0, 3) })),
       overview: { x0: ox0, z0: oz0, res: OR, nx: onx, nz: onz, h: b64(ou) },
+      biomes,
       regions,
       world3d,
       looseChests,
