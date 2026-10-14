@@ -140,7 +140,7 @@ async function findWorldDir(ftp, world) {
       hits.push({ dir, worlds: ws.map((x) => x.w), size: ws[0].size });
       if (/worlds_local/i.test(dir)) inWorlds = true;
     }
-    if (depth < 7) items.filter((i) => i.dir && !(SKIP.test(i.name) && !/^\.config$/i.test(i.name))).forEach((i) => queue.push([join(dir, i.name), depth + 1]));
+    if (depth < 7) items.filter((i) => i.dir && !/backup/i.test(i.name) && !(SKIP.test(i.name) && !/^\.config$/i.test(i.name))).forEach((i) => queue.push([join(dir, i.name), depth + 1])); // Sicherungsordner (…_backup_auto-…) nie nehmen
     // .config/unity3d/... und worlds_local bevorzugen
     queue.sort((a, b) => (/config|unity3d|IronGate|Valheim|worlds/i.test(b[0]) ? 1 : 0) - (/config|unity3d|IronGate|Valheim|worlds/i.test(a[0]) ? 1 : 0));
   }
