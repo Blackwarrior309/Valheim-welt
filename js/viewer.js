@@ -91,7 +91,7 @@
 <div class="vw-main">
   <div class="vw-pane" data-p="map"><canvas class="map"></canvas>
     <div class="vw-side"><button class="vw-mob" data-min>Menü</button><button class="pri w3d" style="width:100%;margin-top:4px">🌍 Ganze Welt in 3D ansehen</button><h2>Basen</h2><div class="vw-maplist"></div>
-      <h2>Legende</h2><div class="sub">● Basis (anklicken = 3D) · ◆ Portal · ▲ Boss/Ort (grau = noch nicht erkundet)<br>Ziehen = verschieben · Mausrad/Pinch = Zoom</div></div>
+      <h2>Legende</h2><div class="sub">● Basis (anklicken = 3D) · ◆ Portal · ▲ Boss/Ort (grau = noch nicht erkundet)<br>Ziehen = verschieben · Mausrad/Pinch = Zoom</div><div class="sub biolg" style="margin-top:6px"></div></div>
   </div>
   <div class="vw-pane" data-p="3d" hidden><canvas class="gl"></canvas><div class="vw-labels"></div>
     <div class="vw-side s3"><button class="vw-mob" data-min>Menü</button>
@@ -137,6 +137,10 @@
     let S = snap, tab = 'map', LIVE = null;
     const areas = () => (S.world3d ? [S.world3d] : []).concat(S.regions);
     const livePlayers = () => (LIVE || (S.live && S.live.players) || []);
+    // Biome → Grundfarbe (ohne Biomdaten: klassisches Grün)
+    const BIO_COL = [null, [111, 154, 69], [92, 86, 52], [196, 202, 208], [52, 86, 50], [190, 172, 88], [92, 52, 42], [226, 236, 244], null, [84, 82, 104]];
+    let BIOU = null, BIOS = null;
+    const bioAt = (x, z) => { const B = S.biomes; if (!B) return 0; if (BIOS !== B) { BIOS = B; BIOU = b64u8(B.b); } const i = Math.floor((x - B.x0) / B.res), j = Math.floor((z - B.z0) / B.res); return (i < 0 || j < 0 || i >= B.nx || j >= B.nz) ? 0 : BIOU[j * B.nx + i]; };
     const setStatus = (t) => { $('.vw-status').textContent = t || ''; };
     setStatus(opts.status);
     function setTab(t) {
@@ -156,10 +160,12 @@
         const x = c.getContext('2d'), id = x.createImageData(o.nx, o.nz);
         for (let j = 0; j < o.nz; j++) for (let i = 0; i < o.nx; i++) {
           const v = u[j * o.nx + i], k = ((o.nz - 1 - j) * o.nx + i) * 4; let r, gg, b, a = 255;
-          if (!v) { a = 0; r = gg = b = 0; } else { const e = v - 100; if (e < 0) { const t = Math.min(1, -e / 25); r = 40 + 30 * (1 - t); gg = 90 + 40 * (1 - t); b = 120 + 30 * (1 - t); } else if (e < 2) { r = 205; gg = 190; b = 140; } else { const t = Math.min(1, (e - 2) / 60); r = 110 + 90 * t; gg = 150 + 50 * t; b = 70 + 100 * t; } }
+          if (!v) { a = 0; r = gg = b = 0; } else { const e = v - 100; if (e < 0) { const t = Math.min(1, -e / 25); r = 40 + 30 * (1 - t); gg = 90 + 40 * (1 - t); b = 120 + 30 * (1 - t); } else if (e < 2) { r = 205; gg = 190; b = 140; } else { const bc = BIO_COL[bioAt(o.x0 + (i + 0.5) * o.res, o.z0 + (j + 0.5) * o.res)]; if (bc) { const t = Math.min(1, (e - 2) / 90); r = bc[0] + (235 - bc[0]) * t * 0.35; gg = bc[1] + (240 - bc[1]) * t * 0.35; b = bc[2] + (245 - bc[2]) * t * 0.35; if (e > 75) { const s2 = Math.min(1, (e - 75) / 40); r += (240 - r) * s2; gg += (244 - gg) * s2; b += (248 - b) * s2; } } else { const t = Math.min(1, (e - 2) / 60); r = 110 + 90 * t; gg = 150 + 50 * t; b = 70 + 100 * t; } } }
           id.data[k] = r; id.data[k + 1] = gg; id.data[k + 2] = b; id.data[k + 3] = a;
         }
         x.putImageData(id, 0, 0); img = c;
+        const NAMES = ['', 'Wiesen', 'Sumpf', 'Berge', 'Schwarzwald', 'Ebenen', 'Aschelande', 'Tiefer Norden', '', 'Nebellande'];
+        $('.biolg').innerHTML = S.biomes ? 'Biome' + (S.biomes.src === 'Weltgenerator' ? ' (exakt)' : ' (geschätzt)') + ':<br>' + [1, 4, 2, 3, 5, 9, 6, 7].map((k) => `<span style="display:inline-block;width:10px;height:10px;border-radius:2px;margin:0 3px 0 6px;vertical-align:-1px;background:rgb(${BIO_COL[k].join(',')})"></span>${NAMES[k]}`).join('') : '';
         // passend einpassen
         const bw = o.nx * o.res, bh = o.nz * o.res; view.cx = o.x0 + bw / 2; view.cz = o.z0 + bh / 2;
         fit(bw, bh);
@@ -383,7 +389,7 @@
           const k = j * NX + i, h = hAt(i, j), x = X0 + i * RS, z = Z0 + j * RS;
           pos[k * 3] = x - CX; pos[k * 3 + 1] = h - WL; pos[k * 3 + 2] = -(z - CZ);
           const sl = Math.hypot(hAt(i + 1, j) - hAt(i - 1, j), hAt(i, j + 1) - hAt(i, j - 1)) / (2 * RS), e = h - WL;
-          if (e < -1) tmp.copy(cSea).lerp(cSand, Math.max(0, 1 + e / 8)); else if (e < 1.6) tmp.copy(cSand); else tmp.copy(cG).lerp(cG2, Math.min(1, (e - 2) / 25));
+          const bc = e >= 1.6 ? BIO_COL[bioAt(x, z)] : null; if (e < -1) tmp.copy(cSea).lerp(cSand, Math.max(0, 1 + e / 8)); else if (e < 1.6) tmp.copy(cSand); else if (bc) { tmp.setRGB(bc[0] / 255, bc[1] / 255, bc[2] / 255); tmp.offsetHSL(0, 0, Math.min(0.08, (e - 2) / 400)); } else tmp.copy(cG).lerp(cG2, Math.min(1, (e - 2) / 25));
           if (e > 70) tmp.lerp(new THREE.Color(0xe8eef2), Math.min(1, (e - 70) / 40));
           if (sl > 0.7) tmp.lerp(cRock, Math.min(1, (sl - 0.7) * 1.5));
           tmp.offsetHSL(0, 0, (Math.sin(x * 0.37) * Math.cos(z * 0.29) + Math.sin(x * 0.11 + z * 0.13)) * 0.03);
