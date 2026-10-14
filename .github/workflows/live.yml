@@ -70,12 +70,6 @@ jobs:
             echo "Noch kein Stand vorhanden."
           fi
 
-      - uses: actions/cache/save@v4
-        if: ${{ steps.sync.outputs.changed == 'true' }}
-        with:
-          path: ${{ runner.temp }}/sync-data
-          key: sync-${{ github.run_id }}
-
       - uses: actions/upload-pages-artifact@v3
         if: ${{ steps.sync.outputs.changed == 'true' || github.event_name != 'schedule' }}
         with:
@@ -84,3 +78,13 @@ jobs:
       - id: deploy
         if: ${{ steps.sync.outputs.changed == 'true' || github.event_name != 'schedule' }}
         uses: actions/deploy-pages@v4
+        with:
+          timeout: 1800000          # GitHub Pages braucht manchmal > 10 Min.
+
+      # Zwischenspeicher erst nach erfolgreicher Veröffentlichung sichern –
+      # schlägt sie fehl, holt der nächste Lauf die Welt neu und versucht es wieder.
+      - uses: actions/cache/save@v4
+        if: ${{ always() && steps.sync.outputs.changed == 'true' && steps.deploy.outcome == 'success' }}
+        with:
+          path: ${{ runner.temp }}/sync-data
+          key: sync-${{ github.run_id }}
