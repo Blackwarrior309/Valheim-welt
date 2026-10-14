@@ -122,18 +122,34 @@ const join = (a, b) => (a.endsWith('/') ? a : a + '/') + b;
 async function findWorldDir(ftp, world) {
   const queue = [['/', 0]], seen = new Set(); const hits = [];
   const SKIP = /^(\.|proc|sys|dev|lib|bin|usr|etc|var|tmp|steamapps|Steam|steamcmd|valheim_server_Data|BepInEx|MonoBleedingEdge|logs?|backups?)$/i;
-  let visited = 0;
+  let visited = 0, inWorlds = false;
   while (queue.length && visited < 400) {
     const [dir, depth] = queue.shift(); if (seen.has(dir)) continue; seen.add(dir); visited++;
+    if (inWorlds && !/worlds_local/i.test(dir)) continue;          // nach dem ersten worlds_local nur noch dort weitersuchen
     let items; try { items = await ftp.list(dir); } catch (e) { continue; }
     const fwl = items.filter((i) => !i.dir && /\.fwl2?$/i.test(i.name) && !/backup|\.old$/i.test(i.name));
-    if (fwl.length) { const size = (w) => { const d = items.find((i) => i.name === w + '.db2' || i.name === w + '.db'); return d ? d.size : 0; }; const ws = fwl.map((f) => f.name.replace(/\.fwl2?$/i, '')).sort((a, b) => size(b) - size(a)); hits.push({ dir, worlds: ws }); if (/worlds_local/i.test(dir)) break; }
+    if (fwl.length) {
+      const db = (w) => items.find((i) => i.name === w + '.db2' || i.name === w + '.db');
+      const ws = [];
+      for (const w of fwl.map((f) => f.name.replace(/\.fwl2?$/i, ''))) {
+        let size = db(w) ? db(w).size : 0;                     // Valheim 1.0: der Großteil steckt in den .chunk-Dateien im Unterordner
+        if (items.some((i) => i.dir && i.name === w)) { try { (await ftp.list(join(dir, w))).forEach((i) => { if (!i.dir) size += i.size || 0; }); } catch (e) { } }
+        ws.push({ w, size, mod: db(w) ? db(w).mod : '' });
+      }
+      ws.sort((a, b) => b.size - a.size || String(b.mod).localeCompare(String(a.mod)));
+      hits.push({ dir, worlds: ws.map((x) => x.w), size: ws[0].size });
+      if (/worlds_local/i.test(dir)) inWorlds = true;
+    }
     if (depth < 7) items.filter((i) => i.dir && !(SKIP.test(i.name) && !/^\.config$/i.test(i.name))).forEach((i) => queue.push([join(dir, i.name), depth + 1]));
-    // .config/unity3d/... bevorzugen
+    // .config/unity3d/... und worlds_local bevorzugen
     queue.sort((a, b) => (/config|unity3d|IronGate|Valheim|worlds/i.test(b[0]) ? 1 : 0) - (/config|unity3d|IronGate|Valheim|worlds/i.test(a[0]) ? 1 : 0));
   }
   if (!hits.length) throw new Error('Kein Weltordner (.fwl2) auf dem FTP gefunden. Bitte "remoteDir" in der Konfiguration eintragen.');
-  const pref = hits.find((h) => /worlds_local/i.test(h.dir)) || hits[0];
+  hits.forEach((h) => log('  Weltordner:', h.dir, '→', h.worlds.join(', '), '(' + (h.size / 1e6).toFixed(1) + ' MB)'));
+  const pool = hits.some((h) => /worlds_local/i.test(h.dir)) ? hits.filter((h) => /worlds_local/i.test(h.dir)) : hits;
+  const want = world && pool.find((h) => h.worlds.includes(world) || h.dir.split('/').pop() === world);
+  const pref = want || pool.slice().sort((a, b) => b.size - a.size)[0];
+  if (want && !pref.worlds.includes(world)) pref.picked = pref.worlds[0];
   return pref;
 }
 
@@ -160,7 +176,7 @@ async function listWorldFiles(ftp, dir, world, others) {
     for (const it of items) {
       const p = join(d, it.name);
       if (/backup|\.old$|\.tmp$/i.test(it.name)) continue;
-      if (others.some((o) => o !== world && it.name.startsWith(o))) continue;
+      if (others.some((o) => o !== world && it.name.startsWith(o + '.'))) continue;
       if (it.dir) { if (depth < 3) await walk(p, depth + 1); continue; }
       if (it.name.startsWith(world + '.') || /\.chunk$|\.chunk \d+$/i.test(it.name) || depth > 0 && /\.(db2|fwl2)$/i.test(it.name)) out.push({ path: p, rel: p.slice(dir.length).replace(/^\//, ''), size: it.size, mod: it.mod });
     }
@@ -232,9 +248,11 @@ async function runOnce(cfg) {
     // 2) Spielstand (.fwl2/.db2/.chunk)
     let dir = ftpc.remoteDir && ftpc.remoteDir !== 'auto' ? ftpc.remoteDir : state.remoteDir;
     let worlds = state.worlds || [];
-    if (!dir) { log('Suche Weltordner auf dem Server …'); const f = await findWorldDir(ftp, cfg.world); dir = f.dir; worlds = f.worlds; log('Gefunden:', dir, '→', worlds.join(', ')); }
-    else if (!worlds.length) { worlds = (await ftp.list(dir)).filter((i) => /\.fwl2?$/i.test(i.name)).map((i) => i.name.replace(/\.fwl2?$/i, '')); }
-    const world = cfg.world || worlds[0];
+    if (state.v !== 2) { ['remoteDir', 'worlds', 'files', 'lastUpload'].forEach((k) => delete state[k]); state.v = 2; if (!(ftpc.remoteDir && ftpc.remoteDir !== 'auto')) dir = undefined; worlds = []; }
+    let picked = null;
+    if (!dir) { log('Suche Weltordner auf dem Server …'); const f = await findWorldDir(ftp, cfg.world); dir = f.dir; worlds = f.worlds; picked = f.picked || null; state.picked = picked; log('Gewählt:', dir, '→', worlds.join(', ')); }
+    else { picked = state.picked || null; if (!worlds.length) worlds = (await ftp.list(dir)).filter((i) => /\.fwl2?$/i.test(i.name)).map((i) => i.name.replace(/\.fwl2?$/i, '')); }
+    const world = (cfg.world && worlds.includes(cfg.world) ? cfg.world : null) || picked || worlds[0];
     if (!world) throw new Error('Keine Welt in ' + dir + ' gefunden.');
     if (!cfg.world && worlds.length > 1) log('Mehrere Welten gefunden (' + worlds.join(', ') + '), nehme die größte: „' + world + '“. Andere mit "world" in der Konfiguration wählen.');
     state.remoteDir = dir; state.worlds = worlds;
