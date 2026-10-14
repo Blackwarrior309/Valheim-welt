@@ -228,6 +228,7 @@
     const H_PORTAL = new Set(['portal_wood', 'portal_stone', 'portal'].map(stable));
     const H_BED = new Set(['bed', 'piece_bed02'].map(stable)), H_SIGN = stable('sign'), H_TOMB = stable('Player_tombstone');
     let gx = new Float32Array(1 << 16), gn = 0; // Bodenpunkte x,y,z
+    const gCells = new Set(), alt = []; // Ersatz-Bodenpunkte für Gebiete ohne bekannte Pflanzen (z. B. Aschelande)
     const pushG = (x, y, z) => { if (gn * 3 + 3 > gx.length) { const t = new Float32Array(gx.length * 2); t.set(gx); gx = t; } gx[gn * 3] = x; gx[gn * 3 + 1] = y; gx[gn * 3 + 2] = z; gn++; };
     const pieces = []; const nature = []; const signs = []; const portals = []; const beds = []; const conts = []; const tombs = [];
     let total = 0;
@@ -236,8 +237,9 @@
           const name = PREF[prefab];
           const cr = L ? L[K.creator] : undefined;
           if (cr !== undefined || (name && SPEC[name])) pieces.push([x, y, z, yaw, prefab, cr !== undefined ? cr.toString() : '']);
-          // Bodenhöhe: bekannte Pflanzen/Steine und jedes andere natürliche Objekt (nicht gebaut) – so klappt es in allen Biomen (z. B. Aschelande)
-          if (GROUND.has(prefab) || (cr === undefined && !(name && SPEC[name]) && !H_PORTAL.has(prefab))) pushG(x, y, z);
+          // Bodenhöhe: bekannte Pflanzen/Steine; andere natürliche Objekte nur als Ersatz (siehe unten), unsichtbare Systemobjekte (_ZoneCtrl usw., liegen auf Höhe 0) nie
+          if (GROUND.has(prefab)) { pushG(x, y, z); gCells.add(Math.floor(x / 32) + ',' + Math.floor(z / 32)); }
+          else if (cr === undefined && !(name && (SPEC[name] || name[0] === '_')) && !H_PORTAL.has(prefab) && y > WATER - 40) { if (alt.length < 3e6) alt.push(x, y, z); }
           const nk = NAT[prefab]; if (nk) nature.push([nk, x, y, z, yaw, scale]);
           if (cr === undefined) { const bh = hintOf(prefab); if (bh) { const k = Math.floor(x / BR) + ',' + Math.floor(z / BR); let v = bioVotes.get(k); if (!v) bioVotes.set(k, (v = new Uint16Array(10))); v[bh]++; } }
           if (H_PORTAL.has(prefab)) portals.push({ tag: (S && S[K.tag]) || '', x, y, z });
@@ -321,6 +323,8 @@
     clusters.sort((a, b) => b.n - a.n);
 
     // Bodenpunkte als Raster-Index für schnelle Abfrage
+    // Ersatzpunkte nur dort, wo keine bekannten Bodenobjekte liegen (32-m-Zellen)
+    for (let i = 0; i < alt.length; i += 3) if (!gCells.has(Math.floor(alt[i] / 32) + ',' + Math.floor(alt[i + 2] / 32))) pushG(alt[i], alt[i + 1], alt[i + 2]);
     const ground = gx.subarray(0, gn * 3);
     function heightGrid(x0, z0, w, h, res, far) {
       const cr = res * 2, cw = Math.ceil(w * res / cr) + 1, ch = Math.ceil(h * res / cr) + 1;
@@ -439,7 +443,15 @@
     for (let i = 0; i < gn; i++) { const ci = Math.floor((ground[i * 3] - ox0) / OR), cj = Math.floor((ground[i * 3 + 2] - oz0) / OR); const k = cj * onx + ci; const y = ground[i * 3 + 1]; if (y < 400 && !(ov[k] <= y)) ov[k] = y; }
     const ou = new Uint8Array(onx * onz);
     for (let i = 0; i < ou.length; i++) ou[i] = isNaN(ov[i]) ? 0 : Math.max(1, Math.min(255, Math.round(ov[i] - WATER) + 100));
-    if (EXP) for (let j = 0; j < onz; j++) for (let i = 0; i < onx; i++) { const k = j * onx + i; if (!ou[k] && expAt(ox0 + (i + 0.5) * OR, oz0 + (j + 0.5) * OR)) ou[k] = 80; } // aufgedeckt, ohne Pflanzen → Wasser
+    if (EXP) { // aufgedeckt, aber ohne Bodenpunkte: aus Nachbarzellen (bis 3 Zellen) auffüllen, sonst Wasser
+      const src = ou.slice();
+      for (let j = 0; j < onz; j++) for (let i = 0; i < onx; i++) {
+        const k = j * onx + i; if (src[k] || !expAt(ox0 + (i + 0.5) * OR, oz0 + (j + 0.5) * OR)) continue;
+        let sum = 0, n = 0;
+        for (let d = 1; d <= 3 && !n; d++) for (let dj = -d; dj <= d; dj++) for (let di = -d; di <= d; di++) { const a = i + di, b = j + dj; if (a < 0 || b < 0 || a >= onx || b >= onz) continue; const v = src[b * onx + a]; if (v) { sum += v; n++; } }
+        ou[k] = n ? Math.round(sum / n) : 80;
+      }
+    }
 
     // Biom-Raster (64 m) über die Übersicht: exakt vom Mod, sonst aus Objekten geschätzt
     let biomes = null;
