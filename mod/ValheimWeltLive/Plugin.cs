@@ -298,6 +298,7 @@ namespace ValheimWeltLive
                 string full = Path.GetFullPath(Path.Combine(webRoot, rel));
                 if (!full.StartsWith(Path.GetFullPath(webRoot)) || !File.Exists(full)) { res.StatusCode = 404; Send(res, "Nicht gefunden", "text/plain"); return; }
                 var data = File.ReadAllBytes(full);
+                res.AddHeader("Cache-Control", "no-cache"); // nach Updates immer die neue Webseite laden
                 res.ContentType = Mime(full); res.ContentLength64 = data.Length; res.OutputStream.Write(data, 0, data.Length); res.Close();
             }
             catch (Exception e) { try { res.StatusCode = 500; res.Close(); } catch { } Logger.LogDebug(e.Message); }
