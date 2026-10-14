@@ -37,6 +37,8 @@ namespace ValheimWeltLive
         volatile string playersJson = "[]";
         volatile string infoJson = "{}";
         long dumpTime;
+        byte[] biomeGrid; string biomeWorld; bool biomeBusy;          // Biom-Raster aus dem Weltgenerator (einmal je Welt)
+        const int BIO_N = 320; const float BIO_RES = 64f, BIO_X0 = -10240f;
         float nextWorld, nextPlayers;
         volatile bool building;
         string webRoot;
@@ -70,7 +72,51 @@ namespace ValheimWeltLive
             if (ZNet.instance == null || ZDOMan.instance == null) return;
             float t = Time.realtimeSinceStartup;
             if (t >= nextPlayers) { nextPlayers = t + Mathf.Max(0.25f, cfgPlayerSeconds.Value); try { playersJson = CollectPlayers(); } catch (Exception e) { Logger.LogDebug(e); } }
+            if (!biomeBusy && WorldGenerator.instance != null && ZNet.instance != null && (biomeGrid == null || biomeWorld != ZNet.instance.GetWorldName())) StartCoroutine(BuildBiomes());
             if (t >= nextWorld && !building) { nextWorld = t + Mathf.Max(10, cfgWorldSeconds.Value); StartCoroutine(BuildDump()); }
+        }
+
+        // ---------------- Biome ----------------
+        static byte BiomeIndex(Heightmap.Biome b)
+        {
+            switch (b)
+            {
+                case Heightmap.Biome.Meadows: return 1; case Heightmap.Biome.Swamp: return 2; case Heightmap.Biome.Mountain: return 3;
+                case Heightmap.Biome.BlackForest: return 4; case Heightmap.Biome.Plains: return 5; case Heightmap.Biome.AshLands: return 6;
+                case Heightmap.Biome.DeepNorth: return 7; case Heightmap.Biome.Ocean: return 8; case Heightmap.Biome.Mistlands: return 9;
+                default: return 0;
+            }
+        }
+        IEnumerator BuildBiomes()
+        {
+            biomeBusy = true; string w = ZNet.instance.GetWorldName(); var g = new byte[BIO_N * BIO_N]; int done = 0;
+            for (int j = 0; j < BIO_N; j++)
+            {
+                for (int i = 0; i < BIO_N; i++)
+                {
+                    float x = BIO_X0 + (i + 0.5f) * BIO_RES, z = BIO_X0 + (j + 0.5f) * BIO_RES;
+                    try { g[j * BIO_N + i] = (x * x + z * z > 10500f * 10500f) ? (byte)8 : BiomeIndex(WorldGenerator.instance.GetBiome(new Vector3(x, 0f, z))); } catch { }
+                }
+                if (++done % 4 == 0) yield return null;            // auf viele Frames verteilen
+                if (WorldGenerator.instance == null) { biomeBusy = false; yield break; }
+            }
+            biomeGrid = g; biomeWorld = w; biomeBusy = false;
+            Logger.LogInfo("Biom-Raster berechnet (" + BIO_N + "×" + BIO_N + ").");
+        }
+
+        // ---------------- aufgedeckte Karte ----------------
+        static readonly FieldInfo F_EXPLORED = typeof(Minimap).GetField("m_explored", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
+        static readonly FieldInfo F_EXPLORED_OTHERS = typeof(Minimap).GetField("m_exploredOthers", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
+        byte[] CollectExplored(out int size, out float pixel)
+        {
+            size = 0; pixel = 0f;
+            var mm = Minimap.instance; if (mm == null || F_EXPLORED == null) return null;     // dedizierter Server hat keine Karte
+            var a = F_EXPLORED.GetValue(mm) as BitArray; if (a == null) return null;
+            size = mm.m_textureSize; pixel = mm.m_pixelSize;
+            var bytes = new byte[(a.Length + 7) / 8]; a.CopyTo(bytes, 0);
+            var b = F_EXPLORED_OTHERS != null ? F_EXPLORED_OTHERS.GetValue(mm) as BitArray : null;   // vom Kartentisch geteilt
+            if (b != null && b.Length == a.Length) { var o = new byte[bytes.Length]; b.CopyTo(o, 0); for (int i = 0; i < bytes.Length; i++) bytes[i] |= o[i]; }
+            return bytes;
         }
 
         // ---------------- Spieler ----------------
@@ -86,6 +132,8 @@ namespace ValheimWeltLive
             if (Player.m_localPlayer != null) Add(Player.m_localPlayer.GetPlayerName(), Player.m_localPlayer.transform.position);
             foreach (var pl in Player.GetAllPlayers()) if (pl != null) Add(pl.GetPlayerName(), pl.transform.position);
             if (ZNet.instance.IsServer()) foreach (var peer in ZNet.instance.GetPeers()) if (peer != null && peer.m_refPos != Vector3.zero) Add(peer.m_playerName, peer.m_refPos);
+            // Mitspieler, die ihre Position teilen (auch weit weg, im Multiplayer)
+            try { foreach (var pi in ZNet.instance.GetPlayerList()) if (pi.m_publicPosition && pi.m_position != Vector3.zero) Add(pi.m_name, pi.m_position); } catch { }
             return sb.Append(']').ToString();
         }
 
@@ -95,6 +143,8 @@ namespace ValheimWeltLive
         IEnumerator BuildDump()
         {
             building = true;
+            byte[] explored = null; int expSize = 0; float expPixel = 0f;
+            byte[] bio = biomeGrid;
             List<Rec> recs = null; string world = "", seed = ""; List<string> keys = new List<string>(); string players = playersJson;
             var locs = new List<KeyValuePair<string, Vector3>>(); var locPlaced = new List<bool>();
             try
@@ -122,6 +172,7 @@ namespace ValheimWeltLive
                 try { var w = typeof(ZNet).GetField("m_world", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Static | BindingFlags.Instance)?.GetValue(ZNet.instance) as World; if (w != null) seed = w.m_seedName ?? ""; } catch { }
                 try { keys = ZoneSystem.instance.GetGlobalKeys(); } catch { }
                 try { CollectLocations(locs, locPlaced); } catch (Exception e) { Logger.LogDebug("Orte: " + e.Message); }
+                try { explored = CollectExplored(out expSize, out expPixel); } catch (Exception e) { explored = null; Logger.LogDebug("Karte: " + e.Message); }
             }
             catch (Exception e) { Logger.LogError("Dump fehlgeschlagen: " + e); building = false; yield break; }
 
@@ -150,6 +201,9 @@ namespace ValheimWeltLive
                             if ((m & 4) != 0) { bw.Write((byte)Math.Min(255, r.strings.Count)); for (int i = 0; i < r.strings.Count && i < 255; i++) { bw.Write(r.strings[i].Key); bw.Write(r.strings[i].Value); } }
                             if ((m & 8) != 0) { bw.Write(r.items.Length); bw.Write(r.items); }
                         }
+                        // aufgedeckte Karte (nur im Spiel-Client vorhanden): "EXPL", Größe, Pixelgröße, Bits
+                        if (explored != null) { bw.Write(Encoding.ASCII.GetBytes("EXPL")); bw.Write(expSize); bw.Write(expPixel); bw.Write(explored.Length); bw.Write(explored); }
+                        if (bio != null) { bw.Write(Encoding.ASCII.GetBytes("BIOM")); bw.Write(BIO_N); bw.Write(BIO_RES); bw.Write(BIO_X0); bw.Write(bio.Length); bw.Write(bio); }
                     }
                     byte[] raw = ms.ToArray();
                     var gz = new MemoryStream(); using (var z = new GZipStream(gz, CompressionMode.Compress, true)) z.Write(raw, 0, raw.Length);
@@ -159,7 +213,9 @@ namespace ValheimWeltLive
                     {
                         string path = string.IsNullOrEmpty(cfgFilePath.Value) ? Path.Combine(Paths.ConfigPath, "ValheimWeltLive", "welt.vwdump") : cfgFilePath.Value;
                         Directory.CreateDirectory(Path.GetDirectoryName(path));
-                        File.WriteAllBytes(path + ".tmp", dumpGz); // gzip-komprimiert (VWD1 innen) if (File.Exists(path)) File.Delete(path); File.Move(path + ".tmp", path);
+                        File.WriteAllBytes(path + ".tmp", dumpGz); // gzip-komprimiert (VWD1 innen)
+                        if (File.Exists(path)) File.Delete(path);
+                        File.Move(path + ".tmp", path);
                     }
                 }
                 catch (Exception e) { Logger.LogError("Dump schreiben: " + e.Message); }
