@@ -367,6 +367,7 @@
       function orbit() {
         pit = Math.max(0.08, Math.min(1.55, pit)); dist = Math.max(12, Math.min(25000, dist));
         cam.position.set(tgt.x + dist * Math.cos(pit) * Math.sin(yaw), tgt.y + dist * Math.sin(pit), tgt.z + dist * Math.cos(pit) * Math.cos(yaw)); cam.lookAt(tgt);
+        const nn = Math.min(40, Math.max(0.5, dist / 400)); if (Math.abs(cam.near - nn) > 0.05) { cam.near = nn; cam.updateProjectionMatrix(); } // Nahgrenze mit dem Zoom: genaue Tiefe, kein Flackern von Wasser/Strand
       }
       function clear() {
         if (content) { scene.remove(content); content.traverse((o) => { if (o.geometry && !Object.values(geos).includes(o.geometry) && o.geometry !== box) o.geometry.dispose(); if (o.material && !Object.values(mats).includes(o.material)) o.material.dispose(); }); }
@@ -687,6 +688,7 @@
         const f = fdir(), rt = new THREE.Vector3(-Math.cos(fyw), 0, Math.sin(fyw)), sp = fspd * (boost ? 4 : 1) * dt;
         fp.addScaledVector(f, mz * sp).addScaledVector(rt, mx * sp); fp.y += my * sp; fp.y = Math.max(-35, Math.min(800, fp.y));
         cam.position.copy(fp); cam.lookAt(fp.clone().add(f));
+        const fn = Math.min(4, Math.max(0.1, (fp.y - WL) / 300)); if (Math.abs(cam.near - fn) > 0.02) { cam.near = fn; cam.updateProjectionMatrix(); }
         HUD.innerHTML = `<b>Flugmodus</b> · ${Math.round(fspd * (boost ? 4 : 1))} m/s · Höhe ${fp.y.toFixed(0)} m<br><span class="m sub">Joystick = fliegen · ziehen = umsehen · ▲▼ Höhe · » schnell</span><span class="k sub">WASD/Pfeile · Maus ziehen = umsehen · Leertaste/E hoch · C/Q runter · Shift schnell · Mausrad Tempo · Gamepad · F/Esc beenden</span>`;
       }
 
