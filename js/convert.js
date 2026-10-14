@@ -329,12 +329,17 @@
     function heightGrid(x0, z0, w, h, res, far) {
       const cr = res * 2, cw = Math.ceil(w * res / cr) + 1, ch = Math.ceil(h * res / cr) + 1;
       const c = new Float32Array(cw * ch).fill(NaN);
-      for (let i = 0; i < gn; i++) {
-        const x = ground[i * 3], y = ground[i * 3 + 1], z = ground[i * 3 + 2];
-        const ci = Math.floor((x - x0) / cr), cj = Math.floor((z - z0) / cr);
-        if (ci < 0 || cj < 0 || ci >= cw || cj >= ch || y > 400) continue;
-        const k = cj * cw + ci; if (!(c[k] <= y)) c[k] = y;
-      }
+      // Höhe je Zelle = Median der Bodenpunkte (der tiefste Punkt wäre oft ein Stein im Wasser am Ufer → Insel würde zu Meer)
+      const cnt = new Uint32Array(cw * ch);
+      for (let i = 0; i < gn; i++) { const ci = Math.floor((ground[i * 3] - x0) / cr), cj = Math.floor((ground[i * 3 + 2] - z0) / cr); if (ci >= 0 && cj >= 0 && ci < cw && cj < ch && ground[i * 3 + 1] <= 400) cnt[cj * cw + ci]++; }
+      const off = new Uint32Array(cw * ch + 1); for (let i = 0; i < cw * ch; i++) off[i + 1] = off[i] + cnt[i];
+      const ys = new Float32Array(off[cw * ch]), fillp = off.slice(0, cw * ch);
+      for (let i = 0; i < gn; i++) { const ci = Math.floor((ground[i * 3] - x0) / cr), cj = Math.floor((ground[i * 3 + 2] - z0) / cr); if (ci >= 0 && cj >= 0 && ci < cw && cj < ch && ground[i * 3 + 1] <= 400) { const k = cj * cw + ci; ys[fillp[k]++] = ground[i * 3 + 1]; } }
+      for (let k = 0; k < cw * ch; k++) { const n = cnt[k]; if (!n) continue; const a = ys.subarray(off[k], off[k] + n); a.sort(); c[k] = a[n >> 1]; }
+      // Bauteile: Gelände nie tiefer als das unterste Bauteil (Basen sind oft abgeholzt; Stege mit Pfosten im Wasser bleiben Wasser)
+      const pc = new Map();
+      for (const p of pieces) { if (!p[5] || p[1] > 400) continue; const ci = Math.floor((p[0] - x0) / cr), cj = Math.floor((p[2] - z0) / cr); if (ci < 0 || cj < 0 || ci >= cw || cj >= ch) continue; const k = cj * cw + ci; const v = pc.get(k); if (v === undefined || p[1] < v) pc.set(k, p[1]); }
+      for (const [k, y] of pc) if (isNaN(c[k]) || c[k] < y - 1.5) c[k] = y - 0.3;
       let known = null;
       if (far) { // nur erkundete Gebiete: Rest wird Meeresboden
         known = new Uint8Array(cw * ch); for (let i = 0; i < c.length; i++) known[i] = isNaN(c[i]) ? 0 : 1;
