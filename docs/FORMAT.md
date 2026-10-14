@@ -27,6 +27,7 @@ Der Viewer liest `.vwelt` per Datei, per Teilen-HTML (eingebettet) oder per URL 
   "portals":   [ { "tag": "Lager", "x": -574, "z": -385 } ],
   "bases":     [ { "id": "b0", "name": "Hauptbasis", "center": [x,z], "pieces": 13001, "chests": 165, "builders": [[name,count],…] } ],
   "overview":  { "x0", "z0", "res": 32, "nx", "nz", "h": "<base64 Uint8>" },   // 0 = keine Daten, sonst Höhe-30+100
+  "biomes":    { "x0", "z0", "res": 64, "nx", "nz", "b": "<base64 Uint8>", "src": "Weltgenerator"|"geschätzt" },   // 1 Wiesen 2 Sumpf 3 Berge 4 Schwarzwald 5 Ebenen 6 Aschelande 7 Tiefer Norden 8 Meer 9 Nebellande
   "world3d":   Region,                   // ganze erkundete Welt (id "world", 16-m-Gelände, alle Bauteile, Natur ausgedünnt, "mask" = erkundete Zellen)
   "regions":   [ Region, … ],             // Detail-3D je Basis (4-m-Gelände)
   "stats":     { "zdos", "chunks", "pieces", "playerPieces", "containers", "groundPoints", "duplicatesSkipped" },
@@ -81,6 +82,9 @@ i32 n  ZDO[n]:
    maske&1: i64 creator   maske&2: i64 owner
    maske&4: u8 k, (i32 keyHash, str wert)[k]     (text, tag, ownerName, author, tagauthor, authorName)
    maske&8: i32 len, bytes[len]                  (Kisteninventar „items“)
+danach optional, in beliebiger Reihenfolge:
+"EXPL"  i32 größe(2048)  f32 pixel(12 m)  i32 len  bytes[len]   aufgedeckte Karte als Bitfeld (Spiel-Client; Pixel = Welt/pixel + größe/2, Bit i → byte[i>>3] & (1<<(i&7)))
+"BIOM"  i32 n(320)  f32 res(64 m)  f32 ursprung(-10240)  i32 len  bytes[len]   Biom je Zelle aus dem Weltgenerator (Werte wie "biomes")
 ```
 
 Der Konverter (`js/convert.js`) wandelt einen Dump genau wie Spielstände in eine `.vwelt` um; `live.players` enthält dann die Spielerpositionen.
