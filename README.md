@@ -19,6 +19,7 @@ English and German interface (switch at the top right, or `?lang=en`).
    Local worlds: `%USERPROFILE%\AppData\LocalLow\IronGate\Valheim\worlds_local`
 3. Look around: map, 3D (whole world or single bases, fly mode with WASD), chest search, world & players.
 4. Share: **“Share file (.html)”** at the top. The file opens with a double-click in any browser, even offline.
+5. Export buildings: **3D → Export buildings** – click a building (or a radius), download a `.blueprint` and place it in game as a hologram with the [PlanBuild](https://github.com/sirskunkalot/PlanBuild) mod.
 
 Old worlds (`.fwl` + `.db`) are not supported: load and save them once in the current game.
 
@@ -88,6 +89,7 @@ Oberfläche auf Deutsch und Englisch (Umschalter oben rechts).
    Lokale Welten liegen unter `%USERPROFILE%\AppData\LocalLow\IronGate\Valheim\worlds_local`.
 3. Ansehen: Karte, 3D (ganze Welt oder einzelne Basen, Flugmodus mit WASD), Kisten durchsuchen, Welt & Spieler.
 4. Teilen: oben **„Teilen-Datei (.html)“** speichern und verschicken. Öffnet sich per Doppelklick, auch offline.
+5. Gebäude exportieren: **3D → Gebäude exportieren** – Gebäude (oder Umkreis) anklicken, `.blueprint` herunterladen und im Spiel mit dem Mod [PlanBuild](https://github.com/sirskunkalot/PlanBuild) als Hologramm platzieren und nachbauen.
 
 Alte Welten (`.fwl` + `.db`) einmal im aktuellen Spiel laden und speichern.
 
