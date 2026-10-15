@@ -19,6 +19,16 @@ Oder per r2modman/Thunderstore installieren (Paket: `tools/package-mod.sh` → `
 
 `build.bat` baut die DLL, packt die Webseite dazu und kopiert alles nach `Valheim\BepInEx\plugins\ValheimWeltLive\`. Ohne das Wort `install` wird nur das Paket unter `mod\paket\` erstellt.
 
+## Kisten-Suche im Spiel (F7)
+
+Im Spiel **F7** drücken und einen Item-Namen eintippen (in der Spielsprache):
+- Kisten in der Nähe bekommen eine Beschriftung mit der Menge, alle Kisten mit dem Item erscheinen als **Pins auf der Karte**.
+- Das **Rezept** zeigt jede Zutat mit Bestand in Kisten und Inventar, „suchen“ springt zur Zutat.
+- Mit `LiveMapUrl` (Abschnitt `[Suche]`, z. B. `https://blackwarrior309.github.io/Valheim-Mowlserver/live/welt.vwelt`) findet die Suche auch weit entfernte Kisten – Stand der Live-Karte.
+- Von der Webseite (`http://localhost:8686`): Kisten-Ansicht → **„🎯 Im Spiel suchen“**.
+
+Funktioniert auf jedem Server, nur du brauchst den Mod.
+
 ## Lokal (Einzelspieler oder selbst gehostet)
 
 1. Mod installieren (siehe oben), Valheim starten, Welt laden.

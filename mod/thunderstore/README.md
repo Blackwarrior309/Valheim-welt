@@ -10,6 +10,16 @@ It reads your world straight from the running game and shows it in the browser, 
 
 Everything stays on your PC. The mod only opens a local web page on `http://localhost:8686`.
 
+## In-game chest search (F7)
+
+Press **F7** in game and type an item name (in your game language):
+- nearby chests show a label with the amount, all chests with the item appear as **pins on the map**
+- the **recipe** lists every ingredient with how much you have in chests and inventory – click “suchen” to look for an ingredient
+- set `LiveMapUrl` (section `[Suche]`) to your live map's world file (e.g. `https://NAME.github.io/REPO/live/welt.vwelt`) to find chests far away too
+- from the web page (`http://localhost:8686`): chest view → **Search in game**
+
+Works on any server – only you need the mod.
+
 ## Usage (single player or self-hosted)
 
 1. Install with r2modman / Thunderstore Mod Manager (or manually, see below).
