@@ -9,7 +9,7 @@ English and German interface (switch at the top right, or `?lang=en`).
 | | What | For whom |
 |---|---|---|
 | 🌍 **Viewer** | Drop your world files on the page → 3D map, chest search, share file. Runs entirely in your browser, nothing is uploaded. | everyone |
-| 🗺 **Live map for your server** | A copy of this repo fetches your server's world via FTP every ~10 minutes (GitHub Actions) and publishes it on GitHub Pages. → [docs/LIVE-MAP.md](docs/LIVE-MAP.md) | server owners (e.g. Nitrado) |
+| 🗺 **Live map for your server** | A copy of this repo fetches your server's world via FTP every ~10 minutes (GitHub Actions) and publishes it on GitHub Pages, with a building time-lapse. → **[Use this template](https://github.com/new?template_owner=Blackwarrior309&template_name=Valheim-welt)**, guide: [docs/LIVE-MAP.md](docs/LIVE-MAP.md) | server owners (e.g. Nitrado) |
 | 🔌 **Mod “Valheim Welt Live”** | BepInEx mod: live map of your own game on `http://localhost:8686` with players in real time; on a server it writes a world file for the live map. → [mod/thunderstore/README.md](mod/thunderstore/README.md), [docs/SERVER.md](docs/SERVER.md) | players & server owners |
 
 ## Viewer – how to
@@ -78,7 +78,7 @@ Oberfläche auf Deutsch und Englisch (Umschalter oben rechts).
 | | Was | Für wen |
 |---|---|---|
 | 🌍 **Viewer** | Weltdateien auf die Seite ziehen → 3D-Karte, Kistensuche, Teilen-Datei. Läuft komplett im Browser, nichts wird hochgeladen. | alle |
-| 🗺 **Live-Karte für deinen Server** | Eine Kopie dieses Repos holt die Serverwelt alle ~10 Minuten per FTP (GitHub Actions) und veröffentlicht sie auf GitHub Pages. → [docs/LIVE-MAP.md](docs/LIVE-MAP.md) | Server-Betreiber (z. B. Nitrado) |
+| 🗺 **Live-Karte für deinen Server** | Eine Kopie dieses Repos holt die Serverwelt alle ~10 Minuten per FTP (GitHub Actions) und veröffentlicht sie auf GitHub Pages, mit Bau-Zeitraffer. → **[Use this template](https://github.com/new?template_owner=Blackwarrior309&template_name=Valheim-welt)**, Anleitung: [docs/LIVE-MAP.md](docs/LIVE-MAP.md#deutsch) | Server-Betreiber (z. B. Nitrado) |
 | 🔌 **Mod „Valheim Welt Live“** | BepInEx-Mod: Live-Karte des eigenen Spiels auf `http://localhost:8686` mit Spielern in Echtzeit; auf dem Server schreibt er eine Weltdatei für die Live-Karte. → [mod/README.md](mod/README.md), [docs/SERVER.md](docs/SERVER.md#deutsch) | Spieler & Server-Betreiber |
 
 ## So geht's
