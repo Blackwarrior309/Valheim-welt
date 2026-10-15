@@ -44,7 +44,8 @@ index.html, css/, js/, lib/, plans/   the website (static, GitHub Pages)
 .github/workflows/live.yml            live map: FTP → convert → GitHub Pages (docs/LIVE-MAP.md)
 sync/                                 Valheim-Sync: the same for a PC (FTP → GitHub), see sync/LIESMICH.txt
 mod/                                  mod source (C#, BepInEx), Thunderstore files, server config
-tools/                                convert.cjs (command line), package-mod.sh, name list generators
+tools/                                convert.cjs (command line), package-mod.sh, name list generators,
+                                      gen_recipes.py (recipes & building costs from the Jötunn data lists → js/recipes.js)
 docs/                                 LIVE-MAP.md, SERVER.md, FORMAT.md (.vwelt, .vwplan, VWD1)
 ```
 
