@@ -4,6 +4,8 @@
 #   VS_FTP_HOST, VS_FTP_USER, VS_FTP_PASSWORD  (Pflicht)
 #   VS_FTP_PORT, VS_FTP_DIR, VS_WORLD          (optional; Standard: 21, Ordner automatisch, größte Welt)
 # und Settings → Pages → Source: „GitHub Actions“.
+# Ohne FTP-Secrets wird nur die Webseite (ohne Live-Welt) veröffentlicht.
+# Anleitung: docs/LIVE-MAP.md
 name: Live-Karte
 
 on:
@@ -39,6 +41,7 @@ jobs:
 
       # Zwischenspeicher (Weltdateien, letzter Stand) – liegt außerhalb der Seite, wird nie veröffentlicht
       - uses: actions/cache/restore@v4
+        if: ${{ env.HAS_FTP == 'true' }}
         with:
           path: ${{ runner.temp }}/sync-data
           key: sync-${{ github.run_id }}
@@ -63,6 +66,7 @@ jobs:
         run: node sync/sync.cjs ${{ github.event_name != 'schedule' && '--force' || '' }}
 
       - name: Letzten Stand in die Seite legen
+        if: ${{ env.HAS_FTP == 'true' }}
         run: |
           if [ -f "$RUNNER_TEMP/sync-data/letzter-stand.vwelt" ]; then
             mkdir -p live && cp "$RUNNER_TEMP/sync-data/letzter-stand.vwelt" live/welt.vwelt
@@ -80,7 +84,7 @@ jobs:
         if: ${{ steps.sync.outputs.changed == 'true' || github.event_name != 'schedule' }}
         uses: actions/deploy-pages@v4
         with:
-          timeout: 1800000          # GitHub Pages braucht manchmal > 10 Min.
+          timeout: 600000           # Maximum, das GitHub erlaubt
 
       # Zwischenspeicher erst nach erfolgreicher Veröffentlichung sichern –
       # schlägt sie fehl, holt der nächste Lauf die Welt neu und versucht es wieder.
