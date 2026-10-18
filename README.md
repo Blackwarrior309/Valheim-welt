@@ -56,6 +56,18 @@ python3 -m http.server 8000          # then http://localhost:8000
 node tools/convert.cjs <world folder|zip> world.vwelt [--strip-ids]
 ```
 
+## Whole-world map
+
+The map layer “Whole world (seed)” computes the biomes of unexplored areas from the seed (`js/worldgen.js`).
+For heights, rivers and forests, download “All Data” for your seed on valheim-map.world and run
+
+```bash
+python3 tools/weltkarte.py MapData_<SEED>.zip weltkarte    # needs numpy + Pillow
+```
+
+Commit the resulting `weltkarte/<SEED>.webp` + `.json`; the viewer picks them up automatically for that world
+(unexplored areas are shown slightly darker). The layer “Dungeons” lists crypts, caves, mines and villages from the save.
+
 ## Limits
 
 - **Terrain** is estimated from trees, rocks and plants (plus the biome grid from the mod), not rebuilt from the seed.
@@ -110,6 +122,13 @@ Steam-IDs lassen sich weglassen (Häkchen auf der Startseite); Live-Karte und Mo
 
 Im 3D-Menü unter **„Leistung & Grafik“**: Schatten (Standard aus; wenn an, nur im Stillstand berechnet), Grafik
 (Natur-Texturen, „Einfach“ oder „Blöcke“), Natur-Dichte, Auflösung und Sichtweite. Der Browser merkt sich die Einstellungen.
+
+## Ganze Weltkarte
+
+Die Kartenebene „Ganze Welt (Seed)“ berechnet die Biome unerkundeter Gebiete aus dem Seed. Für Höhen, Flüsse und Wälder
+auf valheim-map.world „All Data“ für den Seed laden und `python3 tools/weltkarte.py MapData_<SEED>.zip weltkarte` ausführen;
+`weltkarte/<SEED>.webp` + `.json` ins Repo legen, der Viewer nimmt sie für diese Welt automatisch (Unerkundetes etwas dunkler).
+Die Ebene „Dungeons“ zeigt Grabkammern, Höhlen, Minen und Dörfer aus dem Spielstand.
 
 ## Feedback
 
