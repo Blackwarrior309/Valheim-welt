@@ -36,6 +36,7 @@
 .vw-tip{position:absolute;pointer-events:none;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:4px 8px;font-size:12px;z-index:6}
 .vw-lbl{position:absolute;transform:translate(-50%,-100%);font-size:11.5px;padding:2px 6px;border-radius:6px;white-space:nowrap;pointer-events:none;background:rgba(15,20,24,.78);color:#f1e6cf;border:1px solid rgba(216,162,74,.6);z-index:2}
 .vw-lbl.bed{border-color:rgba(120,180,255,.6)}.vw-lbl.tomb{border-color:rgba(255,120,120,.7)}
+.vw-bars{display:block;width:72px;margin:2px auto 0}.vw-bars i{display:block;height:4px;border-radius:2px;margin-top:1px;background:rgba(255,255,255,.15);overflow:hidden}.vw-bars i b{display:block;height:100%}.vw-bars .h b{background:#e04a3c}.vw-bars .s b{background:#f0c330}.vw-bars .e b{background:#a46cf0}
 .vw-lbl.pl{border-color:#4cc36b;background:rgba(10,40,20,.85);color:#d9ffe3;z-index:3}.vw-lbl.ch{border-color:#ffc83d;background:rgba(40,30,8,.88);pointer-events:auto;cursor:pointer}
 .vw-cres{margin-top:6px;font-size:12.5px}.vw-cres .r{display:flex;justify-content:space-between;gap:8px;padding:4px 6px;border-radius:6px;cursor:pointer;border-bottom:1px solid var(--line)}
 .vw-cres .r:hover{background:var(--chip)}.vw-cres .r span:last-child{color:var(--acc);white-space:nowrap;font-variant-numeric:tabular-nums}
@@ -220,6 +221,24 @@
     const BIO_COL = [null, [111, 154, 69], [92, 86, 52], [196, 202, 208], [52, 86, 50], [190, 172, 88], [92, 52, 42], [226, 236, 244], null, [84, 82, 104]];
     let BIOU = null, BIOS = null;
     const bioAt = (x, z) => { const B = S.biomes; if (!B) return 0; if (BIOS !== B) { BIOS = B; BIOU = b64u8(B.b); } const i = Math.floor((x - B.x0) / B.res), j = Math.floor((z - B.z0) / B.res); return (i < 0 || j < 0 || i >= B.nx || j >= B.nz) ? 0 : BIOU[j * B.nx + i]; };
+    // Spielerwerte (vom Mod): Balken für HP / Ausdauer / Eitr, Text mit Ausrüstung, Essen, Fähigkeiten
+    const SKILL_DE = { Swords: 'Schwerter', Knives: 'Messer', Clubs: 'Keulen', Polearms: 'Stangenwaffen', Spears: 'Speere', Blocking: 'Blocken', Axes: 'Äxte', Bows: 'Bögen', ElementalMagic: 'Elementarmagie', BloodMagic: 'Blutmagie', Unarmed: 'Unbewaffnet', Pickaxes: 'Spitzhacken', WoodCutting: 'Holzfällen', Crossbows: 'Armbrüste', Jump: 'Springen', Sneak: 'Schleichen', Run: 'Laufen', Swim: 'Schwimmen', Fishing: 'Angeln', Cooking: 'Kochen', Farming: 'Ackerbau', Crafting: 'Handwerk', Dodge: 'Ausweichen', Ride: 'Reiten' };
+    const pct = (a, b) => Math.max(0, Math.min(100, b ? a / b * 100 : 0)).toFixed(0);
+    function statBars(p) {
+      if (p == null || p.hp == null) return '';
+      const mst = p.mst || Math.max(p.st || 0, 100), mei = p.mei || Math.max(p.ei || 0, 1);
+      return `<span class="vw-bars"><i class="h"><b style="width:${pct(p.hp, p.mhp)}%"></b></i><i class="s"><b style="width:${pct(p.st, mst)}%"></b></i>${p.ei > 0 || p.mei > 0 ? `<i class="e"><b style="width:${pct(p.ei, mei)}%"></b></i>` : ''}</span>`;
+    }
+    function statText(p) {
+      if (p == null || p.hp == null) return '';
+      const L = [`❤ ${Math.round(p.hp)} / ${Math.round(p.mhp)}`, `⚡ ${Math.round(p.st)}${p.mst ? ' / ' + Math.round(p.mst) : ''}`]; if (p.ei > 0 || p.mei > 0) L.push(`✦ ${Math.round(p.ei)}${p.mei ? ' / ' + Math.round(p.mei) : ''}`);
+      const nm = (h) => { try { return itemName(h); } catch (e) { return '?'; } };
+      let t = (p.dead ? '✝ ' + T('tot') + ' · ' : '') + L.join(' · ');
+      if (p.eq && p.eq.length) t += '\n' + T('Ausrüstung') + ': ' + p.eq.map(nm).join(', ');
+      if (p.food && p.food.length) t += '\n' + T('Essen') + ': ' + p.food.map(([h, s]) => nm(h) + ' (' + Math.ceil(s / 60) + ' min)').join(', ');
+      if (p.sk && p.sk.length) t += '\n' + T('Fähigkeiten') + ': ' + p.sk.slice().sort((a, b) => b[1] - a[1]).slice(0, 8).map(([k, v]) => T(SKILL_DE[k] || k) + ' ' + Math.floor(v)).join(', ');
+      return t;
+    }
     const setStatus = (t) => { $('.vw-status').textContent = t || ''; };
     setStatus(opts.status);
     function setTab(t) {
@@ -358,7 +377,7 @@
         if (ML.pins) { ctx.textBaseline = 'middle'; (S.pins || []).forEach((p) => { const [x, y] = toS(p.x, p.z); const ic = PIN_IC[p.t] || '•'; ctx.globalAlpha = p.c ? 0.5 : 1; ctx.font = (p.t === 9 ? 'bold 15px' : '13px') + ' system-ui,sans-serif'; ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,.65)'; ctx.fillStyle = p.t === 9 ? '#ffb4a8' : '#ffe08a'; ctx.strokeText(ic, x, y); ctx.fillText(ic, x, y);
             if (view.s > 0.25) { const nm = pinName(p); const t = (nm ? nm + ' · ' : '') + (p.by || ''); if (t) { ctx.font = '11px system-ui,sans-serif'; ctx.strokeText(t, x, y + 13); ctx.fillStyle = '#fff3c9'; ctx.fillText(t, x, y + 13); } } ctx.globalAlpha = 1; }); ctx.textBaseline = 'alphabetic'; ctx.font = '12px system-ui,sans-serif'; }
         if (ML.portals) S.portals.forEach((p) => { const [x, y] = toS(p.x, p.z); ctx.fillStyle = '#b48cff'; ctx.save(); ctx.translate(x, y); ctx.rotate(Math.PI / 4); ctx.fillRect(-3, -3, 6, 6); ctx.restore(); if (view.s > 0.6 && p.tag) { ctx.fillStyle = '#e6dbff'; ctx.fillText(p.tag, x, y - 7); } });
-        if (ML.players) livePlayers().forEach((p) => { const [x, y] = toS(p.x, p.z); ctx.fillStyle = '#4cc36b'; ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, y, 6, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); ctx.fillStyle = '#d9ffe3'; ctx.font = 'bold 12px system-ui,sans-serif'; ctx.fillText(p.name, x, y + 18); ctx.font = '12px system-ui,sans-serif'; });
+        if (ML.players) livePlayers().forEach((p) => { const [x, y] = toS(p.x, p.z); ctx.fillStyle = '#4cc36b'; ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, y, 6, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); ctx.fillStyle = '#d9ffe3'; ctx.font = 'bold 12px system-ui,sans-serif'; ctx.fillText((p.dead ? '✝ ' : '') + p.name + (p.hp != null ? '  ❤ ' + Math.round(p.hp) : ''), x, y + 18); ctx.font = '12px system-ui,sans-serif'; });
         if (ML.bases) S.bases.forEach((b, i) => { const [x, y] = toS(b.center[0], b.center[1]); const rr = Math.max(5, Math.min(14, 3 + Math.sqrt(b.pieces) / 8)); ctx.fillStyle = hover === i ? '#ffd27a' : '#e0a854'; ctx.strokeStyle = '#1b1408'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, y, rr, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); ctx.fillStyle = '#fff'; ctx.font = 'bold 12px system-ui,sans-serif'; ctx.fillText(T(b.name), x, y - rr - 4); ctx.font = '12px system-ui,sans-serif'; });
       }
       const ptr = new Map(); let pd = 0, moved = 0;
@@ -876,7 +895,7 @@
         const all = livePlayers(); $('.plOnline').hidden = !all.length;
         const PL = $('.plList'), names = all.map((p) => p.name).join('|');
         if (PL.dataset.names !== names) { PL.dataset.names = names; PL.innerHTML = all.map((p, i) => `<div class="r" data-i="${i}"><span>● ${esc(p.name)}</span><span class="pc"></span></div>`).join(''); }
-        $$('.pc', PL).forEach((el, i) => { el.textContent = Math.round(all[i].x) + ' / ' + Math.round(all[i].z); });
+        $$('.pc', PL).forEach((el, i) => { const p = all[i]; el.innerHTML = Math.round(p.x) + ' / ' + Math.round(p.z) + statBars(p); el.parentNode.title = statText(p); });
         PL.onclick = (e) => { const d = e.target.closest('.r'); if (!d) return; const p = livePlayers()[+d.dataset.i]; if (!p) return; const inside = reg && p.x >= reg.bounds[0] && p.x <= reg.bounds[1] && p.z >= reg.bounds[2] && p.z <= reg.bounds[3]; if (!inside) { const ri = areas().findIndex((r) => p.x >= r.bounds[0] && p.x <= r.bounds[1] && p.z >= r.bounds[2] && p.z <= r.bounds[3]); if (ri >= 0) selectRegion(ri); } if (fly) toggleFly(false); tgt.copy(W(p.x, p.y, p.z)); dist = 45; pit = 0.6; };
         invalidate();
         // Online-Spieler als laufende Figuren (wie im Laufmodus); Spieler, die schon über MQTT als Figur kommen, nicht doppelt
@@ -888,7 +907,7 @@
           if (d > 60) { O.x = p.x; O.y = p.y; O.z = p.z; } // Teleport (Portal): springen statt gleiten
           O.run = d > 0.15 ? Math.min(2, d / Math.max(0.3, (now - O.t) / 1000) / 4) : 0; O.tx = p.x; O.ty = p.y; O.tz = p.z; O.t = now;
           const r = new THREE.Mesh(plRing, plMat); r.renderOrder = 11; plG.add(r); O.ring = r;
-          const dv = document.createElement('div'); dv.className = 'vw-lbl pl'; dv.textContent = '● ' + p.name; LB.appendChild(dv); O.lab = { d: dv, v: new THREE.Vector3() }; plLab.push(O.lab);
+          const dv = document.createElement('div'); dv.className = 'vw-lbl pl'; dv.innerHTML = (p.dead ? '✝ ' : '● ') + esc(p.name) + statBars(p); LB.appendChild(dv); O.lab = { d: dv, v: new THREE.Vector3() }; plLab.push(O.lab);
         });
         for (const [n, O] of OP) if (!seen.has(n)) { scene.remove(O.h.g); OP.delete(n); }
         opTick(0);
@@ -1227,7 +1246,7 @@
         let P = MP.peers.get(id);
         if (!d) { if (P) { scene.remove(P.h.g); P.lab.remove(); MP.peers.delete(id); invalidate(); } return; }
         if (!P) { const h = makeHero(COLS[[...id].reduce((a, c) => a + c.charCodeAt(0), 0) % COLS.length]); scene.add(h.g); const lab = document.createElement('div'); lab.className = 'vw-lbl pl'; LB.appendChild(lab); P = { h, lab, x: d.x, y: d.y, z: d.z, r: d.r, anim: 0 }; MP.peers.set(id, P); }
-        Object.assign(P, { tx: d.x, ty: d.y, tz: d.z, tr: d.r, run: d.m, g: !!d.g, seen: performance.now(), n: String(d.n || '?').slice(0, 24) }); P.lab.textContent = (P.g ? '🎮 ' : '🧍 ') + P.n; invalidate();
+        Object.assign(P, { tx: d.x, ty: d.y, tz: d.z, tr: d.r, run: d.m, g: !!d.g, seen: performance.now(), n: String(d.n || '?').slice(0, 24) }); P.st = d.hp != null ? d : null; P.lab.innerHTML = (P.g ? '🎮 ' : '🧍 ') + esc(P.n) + statBars(d); invalidate();
       }
       function mpPublish(now, moving) {
         if (!MP.cli || !MP.cli.connected) return;
@@ -1241,11 +1260,11 @@
         (list || []).forEach((p) => {
           if (!p || !p.name) return; const id = 'g' + [...p.name].reduce((a, c) => (Math.imul(a, 31) + c.charCodeAt(0)) | 0, 7).toString(36).replace('-', 'm');
           const o = MP.mine.get(id), r = o ? Math.atan2(p.x - o.x, p.z - o.z) : 0, mv = o ? Math.hypot(p.x - o.x, p.z - o.z) > 0.3 : false;
-          const d = { n: p.name, x: +(+p.x).toFixed(2), y: +(+p.y).toFixed(2), z: +(+p.z).toFixed(2), r: mv ? +(-r + Math.PI).toFixed(2) : (o ? o.r : 0), m: mv ? 1 : 0, g: 1 };
+          const d = Object.assign({}, p.hp != null ? { hp: p.hp, mhp: p.mhp, st: p.st, mst: p.mst, ei: p.ei, mei: p.mei, eq: p.eq, food: p.food, sk: p.sk, dead: p.dead } : {}, { n: p.name, x: +(+p.x).toFixed(2), y: +(+p.y).toFixed(2), z: +(+p.z).toFixed(2), r: mv ? +(-r + Math.PI).toFixed(2) : (o ? o.r : 0), m: mv ? 1 : 0, g: 1 }); delete d.name;
           MP.mine.set(id, Object.assign({}, d, { t: now })); MP.cli.publish(mpRoom() + '/p/' + id, JSON.stringify(d), { qos: 0 });
         });
       }
-      const peerList = () => [...MP.peers.values()].map((P) => ({ name: P.n, x: P.tx, y: P.ty, z: P.tz, web: !P.g }));
+      const peerList = () => [...MP.peers.values()].map((P) => Object.assign({}, P.st || {}, { name: P.n, x: P.tx, y: P.ty, z: P.tz, web: !P.g }));
       function mpLeave() { if (MP.cli && MP.cli.connected) MP.cli.publish(mpRoom() + '/p/' + MP.me, '', { qos: 0 }); MP.lastMsg = ''; }
       function mpTick(dt) {
         if (!MP.peers.size) return; const now = performance.now(); let moved = false; const pr = pane.getBoundingClientRect();

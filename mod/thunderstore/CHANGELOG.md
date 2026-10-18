@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.5.0
+- Player stats for the live map: health, stamina, eitr and equipment (also of players nearby); for yourself also food and skills.
+
 ## 0.4.0
 - In-game chest search (F7): type an item name – nearby chests get a label with the amount, all chests appear as map pins, the recipe shows every ingredient with how much is stored.
 - Optional `LiveMapUrl`: also finds chests far away, using your live map's world file.

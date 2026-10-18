@@ -24,7 +24,7 @@ namespace ValheimWeltLive
     {
         public const string Guid = "de.valheimweltviewer.live";
         public const string Name = "Valheim Welt Live";
-        public const string Version = "0.4.0";
+        public const string Version = "0.5.0";
         static bool loggedFile;
 
         ConfigEntry<bool> cfgHttp, cfgBindAll, cfgWriteFile, cfgStrip, cfgTracks, cfgDeaths;
@@ -192,18 +192,43 @@ namespace ValheimWeltLive
         string CollectPlayers()
         {
             var sb = new StringBuilder("["); bool first = true; var seen = new HashSet<string>();
-            Action<string, Vector3> Add = (n, p) =>
+            Action<string, Vector3, Player> Add = (n, p, pl) =>
             {
                 if (string.IsNullOrEmpty(n) || !seen.Add(n)) return;
                 if (!first) sb.Append(','); first = false;
-                sb.Append("{\"name\":").Append(Json(n)).Append(",\"x\":").Append(F(p.x)).Append(",\"y\":").Append(F(p.y)).Append(",\"z\":").Append(F(p.z)).Append('}');
+                sb.Append("{\"name\":").Append(Json(n)).Append(",\"x\":").Append(F(p.x)).Append(",\"y\":").Append(F(p.y)).Append(",\"z\":").Append(F(p.z));
+                if (pl != null) { try { AppendStats(sb, pl); } catch (Exception e) { Logger.LogDebug(e); } }
+                sb.Append('}');
             };
-            if (Player.m_localPlayer != null) Add(Player.m_localPlayer.GetPlayerName(), Player.m_localPlayer.transform.position);
-            foreach (var pl in Player.GetAllPlayers()) if (pl != null) Add(pl.GetPlayerName(), pl.transform.position);
-            if (ZNet.instance.IsServer()) foreach (var peer in ZNet.instance.GetPeers()) if (peer != null && peer.m_refPos != Vector3.zero) Add(peer.m_playerName, peer.m_refPos);
+            if (Player.m_localPlayer != null) Add(Player.m_localPlayer.GetPlayerName(), Player.m_localPlayer.transform.position, Player.m_localPlayer);
+            foreach (var pl in Player.GetAllPlayers()) if (pl != null) Add(pl.GetPlayerName(), pl.transform.position, pl);
+            if (ZNet.instance.IsServer()) foreach (var peer in ZNet.instance.GetPeers()) if (peer != null && peer.m_refPos != Vector3.zero) Add(peer.m_playerName, peer.m_refPos, null);
             // Mitspieler, die ihre Position teilen (auch weit weg, im Multiplayer)
-            try { foreach (var pi in ZNet.instance.GetPlayerList()) if (pi.m_publicPosition && pi.m_position != Vector3.zero) Add(pi.m_name, pi.m_position); } catch { }
+            try { foreach (var pi in ZNet.instance.GetPlayerList()) if (pi.m_publicPosition && pi.m_position != Vector3.zero) Add(pi.m_name, pi.m_position, null); } catch { }
             return sb.Append(']').ToString();
+        }
+
+        // Werte einer Spielerfigur: HP/Ausdauer/Eitr und Ausrüstung kommen über das Netz (auch von Mitspielern in der Nähe),
+        // Fähigkeiten und Essen gibt es nur für die eigene Figur.
+        static readonly int[] EQ_KEYS = { ZDOVars.s_rightItem, ZDOVars.s_leftItem, ZDOVars.s_helmetItem, ZDOVars.s_chestItem, ZDOVars.s_legItem, ZDOVars.s_shoulderItem, ZDOVars.s_utilityItem, ZDOVars.s_trinketItem, ZDOVars.s_rightBackItem, ZDOVars.s_leftBackItem };
+        void AppendStats(StringBuilder sb, Player pl)
+        {
+            var zdo = ZDOMan.instance != null ? ZDOMan.instance.GetZDO(pl.GetZDOID()) : null; if (zdo == null) return;
+            bool me = pl == Player.m_localPlayer;
+            sb.Append(",\"hp\":").Append(F(pl.GetHealth())).Append(",\"mhp\":").Append(F(pl.GetMaxHealth()));
+            sb.Append(",\"st\":").Append(F(me ? pl.GetStamina() : zdo.GetFloat(ZDOVars.s_stamina, 0f)));
+            sb.Append(",\"ei\":").Append(F(me ? pl.GetEitr() : zdo.GetFloat(ZDOVars.s_eitr, 0f)));
+            if (me) sb.Append(",\"mst\":").Append(F(pl.GetMaxStamina())).Append(",\"mei\":").Append(F(pl.GetMaxEitr()));
+            if (zdo.GetBool(ZDOVars.s_dead, false)) sb.Append(",\"dead\":1");
+            sb.Append(",\"eq\":["); bool f1 = true;
+            foreach (var k in EQ_KEYS) { int h = zdo.GetInt(k, 0); if (h == 0) continue; if (!f1) sb.Append(','); f1 = false; sb.Append(h); }
+            sb.Append(']');
+            if (!me) return;
+            sb.Append(",\"food\":["); f1 = true;
+            foreach (var fd in pl.GetFoods()) { if (fd == null || fd.m_item == null || fd.m_item.m_dropPrefab == null) continue; if (!f1) sb.Append(','); f1 = false; sb.Append("[").Append(fd.m_item.m_dropPrefab.name.GetStableHashCode()).Append(',').Append(F(fd.m_time)).Append(']'); }
+            sb.Append("],\"sk\":["); f1 = true;
+            foreach (var sk in pl.GetSkills().GetSkillList()) { if (sk == null || sk.m_info == null || sk.m_level < 1f) continue; if (!f1) sb.Append(','); f1 = false; sb.Append("[").Append(Json(sk.m_info.m_skill.ToString())).Append(',').Append(F(sk.m_level)).Append(']'); }
+            sb.Append(']');
         }
 
         // ---------------- Welt-Dump (VWD1) ----------------
