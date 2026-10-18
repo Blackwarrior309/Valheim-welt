@@ -25,6 +25,7 @@ Der Viewer liest `.vwelt` per Datei, per Teilen-HTML (eingebettet) oder per URL 
   "globalKeys": [ … ],
   "locations": [ { "k": "GDKing", "n": "Der Älteste", "x": -186, "z": 1219, "v": 1, "c": "b" } ],   // v=1: Zone schon generiert; c = Kategorie (s b t q d h n m v, siehe tools/gen_data.py)
   "pins": [ { "n": "$enemy_gdking", "x", "z", "t": 9, "c": 0, "by": "Charaktername" } ],   // Pins aller Kartentische (t = Pin-Typ, c = abgehakt)
+  "resources": { "copper": [x, z, f, …], "tin": …, "silver", "obsidian", "tar", "scrap", "giant", "tissue", "blackcore", "chitin", "flametal" },   // unabgebaute Vorkommen; f: 1 angebrochen, 2 im Dungeon
   "tableMap": { "size": 1024, "pixel": 24, "tables": 1, "bits": "<base64, 1 Bit je Pixel>" },   // auf Kartentischen aufgedeckte Karte
   "portals":   [ { "tag": "Lager", "x": -574, "z": -385 } ],
   "bases":     [ { "id": "b0", "name": "Hauptbasis", "center": [x,z], "pieces": 13001, "chests": 165, "builders": [[name,count],…] } ],
